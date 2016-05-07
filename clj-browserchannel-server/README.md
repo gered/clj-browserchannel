@@ -5,7 +5,7 @@ communication between ClojureScript and Clojure using Google Closure
 BrowserChannel.
 
 See also: [clj-browserchannel][0]
-[0]:https://github.com/thegeez/clj-browserchannel
+[0]:https://github.com/gered/clj-browserchannel
 
 ## goog.net.BrowserChannel
 
