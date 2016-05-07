@@ -1,4 +1,4 @@
-(defproject net.thegeez/clj-browserchannel-jetty-adapter "0.0.8"
+(defproject net.thegeez/clj-browserchannel-jetty-adapter "0.0.9"
   :description "Jetty async adapter for BrowserChannel"
   :dependencies [[ring/ring-core "1.4.0"]
                  [ring/ring-servlet "1.4.0"]

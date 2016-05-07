@@ -1,4 +1,4 @@
-(defproject chat-demo "0.0.1"
+(defproject chat-demo "0.1.0"
   :description   "Example for using BrowserChannel and a client side with ClojureScript"
 
   :main          chat-demo.server
@@ -10,8 +10,8 @@
                   [compojure "1.4.0"]
                   [clj-pebble "0.2.0"]
                   [prismatic/dommy "1.1.0"]
-                  [net.thegeez/clj-browserchannel-server "0.2.1"]
-                  [net.thegeez/clj-browserchannel-jetty-adapter "0.0.8"]
+                  [net.thegeez/clj-browserchannel-server "0.2.2"]
+                  [net.thegeez/clj-browserchannel-jetty-adapter "0.0.9"]
                   [environ "1.0.3"]]
 
   :plugins       [[lein-cljsbuild "1.1.3"]
