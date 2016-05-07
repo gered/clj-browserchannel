@@ -41,6 +41,10 @@ Once the application server is running, you can then open up
 http://localhost:8080/ in your browser. Open it in multiple browser
 windows to see the chat communication in action.
 
+At the bottom of the `-main` function in `chat-demo.server`, you can 
+comment/uncomment out the different `run-` functions to choose which 
+web server you want to test out the demo with.
+
 ## About
 
 Written by:

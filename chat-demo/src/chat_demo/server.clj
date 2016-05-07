@@ -8,6 +8,7 @@
     [clj-pebble.core :as pebble]
     [net.thegeez.browserchannel :as browserchannel]
     [net.thegeez.jetty-async-adapter :as jetty]
+    [clj-browserchannel-immutant-adapter.core :as immutant]
     [environ.core :refer [env]]))
 
 (defonce clients (atom #{}))
@@ -55,7 +56,16 @@
     {:join? false
      :port  8080}))
 
+(defn run-immutant []
+  (println "Using Immutant adapter")
+  (immutant/run-immutant
+    #'handler
+    {:port 8080}))
+
 (defn -main [& args]
   (if (env :dev) (pebble/set-options! :cache false))
 
-  (run-jetty))
+  ;(run-jetty)
+  (run-immutant)
+
+  )

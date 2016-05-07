@@ -12,6 +12,7 @@
                   [prismatic/dommy "1.1.0"]
                   [net.thegeez/clj-browserchannel-server "0.2.2"]
                   [net.thegeez/clj-browserchannel-jetty-adapter "0.0.9"]
+                  [clj-browserchannel-immutant-adapter "0.0.1"]
                   [environ "1.0.3"]]
 
   :plugins       [[lein-cljsbuild "1.1.3"]
