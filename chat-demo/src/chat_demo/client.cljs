@@ -55,8 +55,16 @@
     (fn []
       (.disconnect channel)
       (events/removeAll)))
+
+  ; disable logging
   (doto (.. channel getChannelDebug getLogger)
     (.setLevel goog.debug.Logger.Level.OFF))
+
+  ; or if you would like to see a ton of browserchannel logging output, uncomment this
+  #_(doto (.. channel getChannelDebug getLogger)
+    (.setLevel goog.debug.Logger.Level.FINER)
+    (.addHandler #(js/console.log %)))
+
   (doto channel
     (.setHandler (handler))
     (.connect "/channel/test" "/channel/bind")))
