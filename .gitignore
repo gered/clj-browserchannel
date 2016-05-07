@@ -15,3 +15,5 @@ pom.xml.asc
 *.iml
 *.ipr
 *.iws
+
+/chat-demo/resources/public/cljs

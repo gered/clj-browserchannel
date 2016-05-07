@@ -39,6 +39,7 @@
                                                                        :optimizations :advanced
                                                                        :pretty-print  false}}}}}}
 
-  :aliases {"uberjar" ["do" ["clean"] ["uberjar"]]}
+  :aliases {"rundemo" ["do" ["clean"] ["cljsbuild" "once"] ["run"]]
+            "uberjar" ["do" ["clean"] ["uberjar"]]}
 
   )
