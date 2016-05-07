@@ -8,7 +8,7 @@
     <!--[if lt IE 9]>
        <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
-    <link rel="stylesheet" href="css/default.css" media="screen" />
+    <link rel="stylesheet" href="default.css" media="screen" />
   </head>
   <body>
     <div id="room">
@@ -17,21 +17,16 @@
       <input id="msg-input" size="30" type="text" disabled="disabled"/>
       <input id="send-button" type="button" value="Send" disabled="disabled"/>
     </div>
-    <div class="about"><a href="https://github.com/thegeez/clj-browserchannel-demo">clj-browserchannel-demo</a></div>
+    <div class="about"><a href="https://github.com/thegeez/clj-browserchannel">clj-browserchannel-demo</a></div>
     <div class="about">
-       Written by: Gijs Stuurman
+      Written by: Gijs Stuurman
       / <a href="http://twitter.com/thegeez">@thegeez</a>
       / <a href="http://thegeez.github.com">Blog</a> / <a href="https://github.com/thegeez">GitHub</a></div>
-    <script>
-      var CLOSURE_NO_DEPS = true;
-    </script>
-    <script type="text/javascript" src="js/bc-dev.js"></script>
-    <script>
-      goog.require('bc.core');
-    </script>
-    <script>
-      bc.core.run();
-      bc.core.connect();
+    {% if dev %}<script type="text/javascript" src="cljs/target/goog/base.js"></script>{% endif %}
+    <script type="text/javascript" src="cljs/app.js"></script>
+    {% if dev %}<script type="text/javascript">goog.require('chat_demo.client');</script>{% endif %}
+    <script type="text/javascript">
+      chat_demo.client.run();
     </script>
   </body>
 </html>
