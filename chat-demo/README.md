@@ -1,4 +1,4 @@
-# chat-demo for clj-browserchannel-demo
+# chat-demo for clj-browserchannel
 
 Cross-browser compatible, real-time, bi-directional
 communication between ClojureScript and Clojure using Google Closure
@@ -26,6 +26,21 @@ The example runs in at least:
 * Internet Explorer 5.5+ (!!)
 * Android browser
 
+## Running
+
+You can either start it up directly from a REPL by simply running:
+
+    (-main)
+
+Or you can run it easily from a command line via the included Leiningen
+alias to build and run everything:
+
+    $ lein rundemo
+
+Once the application server is running, you can then open up
+http://localhost:8080/ in your browser. Open it in multiple browser
+windows to see the chat communication in action.
+
 ## About
 
 Written by:
@@ -34,6 +49,12 @@ Gijs Stuurman / [@thegeez][twt] / [Blog][blog] / [GitHub][github]
 [twt]: http://twitter.com/thegeez
 [blog]: http://thegeez.github.com
 [github]: https://github.com/thegeez
+
+Updated by:
+Gered King / [@geredking][twt] / [Github][github]
+
+[twt]: http://twitter.com/geredking
+[github]: https://github.com/gered
 
 ### License
 
