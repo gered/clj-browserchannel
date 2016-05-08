@@ -5,6 +5,7 @@
     [compojure.route :as route]
     [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
     [ring.util.response :refer [response]]
+    [ring.middleware.anti-forgery :refer [*anti-forgery-token*]]
     [clj-pebble.core :as pebble]
     [net.thegeez.browserchannel.server :as browserchannel]
     [net.thegeez.browserchannel.jetty-async-adapter :as jetty]
@@ -40,14 +41,17 @@
 
 (def app-routes
   (routes
-    (GET "/" [] (pebble/render-resource "html/index.html" {:dev (boolean (env :dev))}))
+    (GET "/" [] (pebble/render-resource
+                  "html/index.html"
+                  {:dev       (boolean (env :dev))
+                   :csrfToken *anti-forgery-token*}))
     (route/resources "/")
     (route/not-found "not found")))
 
 (def handler
   (-> app-routes
       (browserchannel/wrap-browserchannel {:base "/channel" :on-session on-browserchannel-session})
-      (wrap-defaults (assoc-in site-defaults [:security :anti-forgery] false))))
+      (wrap-defaults site-defaults)))
 
 (defn run-jetty []
   (println "Using Jetty adapter")

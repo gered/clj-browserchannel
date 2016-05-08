@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8"/>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <!-- include CSRF token that ring's anti-forgery middleware is expecting.
+         clj-browserchannel's client-side init will pick this meta tag up
+         automatically and include the token in all of browserchannel's
+         requests to the server. -->
+    <meta name="anti-forgery-token" content="{{ csrfToken }}">
     <title>BrowserChannel</title>
     <!-- Le HTML5 shim, for IE6-8 support of HTML elements -->
     <!--[if lt IE 9]>
