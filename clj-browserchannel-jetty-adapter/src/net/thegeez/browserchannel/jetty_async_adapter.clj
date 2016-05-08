@@ -6,7 +6,6 @@
            [org.eclipse.jetty.server.ssl SslSelectChannelConnector]
            [org.eclipse.jetty.util.ssl SslContextFactory]
            [org.eclipse.jetty.continuation Continuation ContinuationSupport ContinuationListener]
-           [org.eclipse.jetty.io EofException]
            [javax.servlet.http HttpServletRequest]
            [java.security KeyStore])
   (:require [ring.util.servlet :as servlet]

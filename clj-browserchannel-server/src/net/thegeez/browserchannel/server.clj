@@ -1,9 +1,7 @@
 (ns net.thegeez.browserchannel.server
   "BrowserChannel server implementation in Clojure."
   (:require [ring.middleware.params :as params]
-            [ring.util.codec :as codec]
             [clojure.data.json :as json]
-            [clojure.string :as str]
             [net.thegeez.browserchannel.async-adapter :as async-adapter])
   (:import [java.util.concurrent ScheduledExecutorService Executors TimeUnit Callable ScheduledFuture]))
 
