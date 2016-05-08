@@ -67,7 +67,7 @@
     (str "/" wolast)))
 
 ;; @todo to test file
-(assert (= (repeat 4 "/foo")
+#_(assert (= (repeat 4 "/foo")
            (map standard-base ["foo" "/foo" "foo/" "/foo"])))
 
 ;; type preserving drop upto for queueus
@@ -93,7 +93,7 @@
                 (sort-by first)     ;; order by request number so that messages are recieved on server in same order
                 (map #(into {} (map second (val %)))))}))
 
-(assert (= {:ofs 0 :maps [{"x" "3" "y" "10"} {"abc" "def"}]}
+#_(assert (= {:ofs 0 :maps [{"x" "3" "y" "10"} {"abc" "def"}]}
            (transform-url-data {"count" "2"
                                 "ofs" "0"
                                 "req0_x" "3"
