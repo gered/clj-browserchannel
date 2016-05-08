@@ -12,28 +12,21 @@
     [net.thegeez.browserchannel.immutant-async-adapter :as immutant]
     [environ.core :refer [env]]))
 
-(defonce clients (atom #{}))
-
 (def event-handlers
   {:on-open
    (fn [session-id request]
-     (println "session " session-id "connected")
-     (swap! clients conj session-id)
-     (doseq [client-id @clients]
-       (browserchannel/send-map client-id {"msg" (str "client " session-id " connected")})))
+     (println "client" session-id "connected")
+     (browserchannel/send-map-to-all {"msg" (str "client " session-id " connected")}))
 
    :on-close
    (fn [session-id request reason]
-     (println "session " session-id " disconnected: " reason)
-     (swap! clients disj session-id)
-     (doseq [client-id @clients]
-       (browserchannel/send-map client-id {"msg" (str "client " session-id " disconnected " reason)})))
+     (println "client" session-id "disconnected. reason: " reason)
+     (browserchannel/send-map-to-all {"msg" (str "client " session-id " disconnected. reason: " reason)}))
 
    :on-receive
    (fn [session-id request m]
-     (println "session " session-id " sent " m)
-     (doseq [client-id @clients]
-       (browserchannel/send-map client-id m)))})
+     (println "client" session-id "sent" m)
+     (browserchannel/send-map-to-all m))})
 
 (def app-routes
   (routes
@@ -46,7 +39,7 @@
 
 (def handler
   (-> app-routes
-      (browserchannel/wrap-browserchannel {:base "/channel" :events event-handlers})
+      (browserchannel/wrap-browserchannel {:events event-handlers})
       (wrap-defaults site-defaults)))
 
 (defn run-jetty []
