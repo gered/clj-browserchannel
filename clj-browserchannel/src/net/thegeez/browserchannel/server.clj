@@ -543,6 +543,20 @@
 (defn send-map [session-id map]
   (send-string session-id (json/write-str map)))
 
+(defn send-map-to-all
+  [m]
+  (doseq [[session-id _] @sessions]
+    (send-map session-id m)))
+
+(defn connected?
+  [session-id]
+  (contains? @sessions session-id))
+
+(defn disconnect!
+  [session-id & [reason]]
+  (if-let [session-agent (get @sessions session-id)]
+    (send-off session-agent close nil (or reason "Disconnected"))))
+
 ;; wrap the respond function from :reactor with the proper
 ;; responsewrapper for either IE or other clients
 (defn wrap-continuation-writers [handler options]
