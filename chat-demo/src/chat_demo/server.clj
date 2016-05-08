@@ -14,30 +14,26 @@
 
 (defonce clients (atom #{}))
 
-(defn on-browserchannel-session
-  [session-id request]
-  (println "session " session-id "connected")
+(def event-handlers
+  {:on-open
+   (fn [session-id request]
+     (println "session " session-id "connected")
+     (swap! clients conj session-id)
+     (doseq [client-id @clients]
+       (browserchannel/send-map client-id {"msg" (str "client " session-id " connected")})))
 
-  (browserchannel/add-listener
-    session-id
-    :close
-    (fn [request reason]
-      (println "session " session-id " disconnected: " reason)
-      (swap! clients disj session-id)
-      (doseq [client-id @clients]
-        (browserchannel/send-map client-id {"msg" (str "client " session-id " disconnected " reason)}))))
+   :on-close
+   (fn [session-id request reason]
+     (println "session " session-id " disconnected: " reason)
+     (swap! clients disj session-id)
+     (doseq [client-id @clients]
+       (browserchannel/send-map client-id {"msg" (str "client " session-id " disconnected " reason)})))
 
-  (browserchannel/add-listener
-    session-id
-    :map
-    (fn [request map]
-      (println "session " session-id " sent " map)
-      (doseq [client-id @clients]
-        (browserchannel/send-map client-id map))))
-
-  (swap! clients conj session-id)
-  (doseq [client-id @clients]
-    (browserchannel/send-map client-id {"msg" (str "client " session-id " connected")})))
+   :on-receive
+   (fn [session-id request m]
+     (println "session " session-id " sent " m)
+     (doseq [client-id @clients]
+       (browserchannel/send-map client-id m)))})
 
 (def app-routes
   (routes
@@ -50,7 +46,7 @@
 
 (def handler
   (-> app-routes
-      (browserchannel/wrap-browserchannel {:base "/channel" :on-session on-browserchannel-session})
+      (browserchannel/wrap-browserchannel {:base "/channel" :events event-handlers})
       (wrap-defaults site-defaults)))
 
 (defn run-jetty []

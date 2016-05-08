@@ -155,7 +155,7 @@
   (send-off listeners-agent
             (fn [listeners]
               (doseq [callback (get-in listeners [session-id event-key])]
-                (apply callback request data))
+                (apply callback session-id request data))
               listeners)))
 ;; end of listeners
 
@@ -520,8 +520,10 @@
       (set-error-handler! session-agent (agent-error-handler-fn (str "session-" (:id session))))
       (set-error-mode! session-agent :continue)
       (swap! sessions assoc id session-agent)
-      (when-let [notify (:on-session options)]
-        (notify id req))
+      (let [{:keys [on-open on-close on-receive]} (:events options)]
+        (if on-close (add-listener id :close on-close))
+        (if on-receive (add-listener id :map on-receive))
+        (if on-open (on-open id req)))
       session-agent)))
 
 (defn session-status [session]
