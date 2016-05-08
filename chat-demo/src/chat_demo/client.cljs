@@ -14,7 +14,7 @@
 (defn toggle-element [elem]
   (dom/toggle-attr! elem :disabled (not (dom/attr elem :disabled))))
 
-(def handler
+(def event-handlers
   {:on-open
    (fn []
      (let [msg-input    (by-id "msg-input")
@@ -43,4 +43,4 @@
                         (dom/set-text! (str "MSG::" msg))))))})
 
 (defn ^:export run []
-  (browserchannel/init! handler))
+  (browserchannel/init! event-handlers))
