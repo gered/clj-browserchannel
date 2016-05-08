@@ -1,8 +1,8 @@
-(ns clj-browserchannel-immutant-adapter.core
+(ns net.thegeez.browserchannel.immutant-async-adapter
   (:require
     [immutant.web :as iweb]
     [immutant.web.async :as iasync]
-    [net.thegeez.async-adapter :as bc-async-adapter]))
+    [net.thegeez.browserchannel.async-adapter :as bc-async-adapter]))
 
 (deftype ImmutantResponse [channel]
   bc-async-adapter/IAsyncAdapter

@@ -1,4 +1,4 @@
-(ns net.thegeez.async-adapter)
+(ns net.thegeez.browserchannel.async-adapter)
 
 (defprotocol IAsyncAdapter
   (head [this status headers])

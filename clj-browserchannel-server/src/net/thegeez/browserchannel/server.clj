@@ -1,11 +1,12 @@
-(ns net.thegeez.browserchannel
+(ns net.thegeez.browserchannel.server
   "BrowserChannel server implementation in Clojure."
   (:require [ring.middleware.params :as params]
             [ring.util.codec :as codec]
             [clojure.data.json :as json]
             [clojure.string :as str]
-            [net.thegeez.async-adapter :as async-adapter])
+            [net.thegeez.browserchannel.async-adapter :as async-adapter])
   (:import [java.util.concurrent ScheduledExecutorService Executors TimeUnit Callable ScheduledFuture]))
+
 ;; @todo: out of order acks and maps - AKH the maps at least is taken care of.
 ;; @todo use a more specific Exception for failing writes, which
 ;; indicate closed connection

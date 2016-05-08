@@ -6,9 +6,9 @@
     [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
     [ring.util.response :refer [response]]
     [clj-pebble.core :as pebble]
-    [net.thegeez.browserchannel :as browserchannel]
-    [net.thegeez.jetty-async-adapter :as jetty]
-    [clj-browserchannel-immutant-adapter.core :as immutant]
+    [net.thegeez.browserchannel.server :as browserchannel]
+    [net.thegeez.browserchannel.jetty-async-adapter :as jetty]
+    [net.thegeez.browserchannel.immutant-async-adapter :as immutant]
     [environ.core :refer [env]]))
 
 (defonce clients (atom #{}))

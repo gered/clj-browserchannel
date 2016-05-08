@@ -1,4 +1,4 @@
-(ns net.thegeez.jetty-async-adapter
+(ns net.thegeez.browserchannel.jetty-async-adapter
   "BrowserChannel adapter for the Jetty webserver, with async HTTP."
   (:import [org.eclipse.jetty.server.handler AbstractHandler]
            [org.eclipse.jetty.server Server Request Response]
@@ -10,7 +10,7 @@
            [javax.servlet.http HttpServletRequest]
            [java.security KeyStore])
   (:require [ring.util.servlet :as servlet]
-            [net.thegeez.async-adapter :as async-adapter]))
+            [net.thegeez.browserchannel.async-adapter :as async-adapter]))
 
 ;; Based on ring-jetty-async-adapter by Mark McGranaghan
 ;; (https://github.com/mmcgrana/ring/tree/jetty-async)
