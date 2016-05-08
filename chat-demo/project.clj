@@ -13,6 +13,7 @@
                   [gered/clj-browserchannel-server "0.2.2"]
                   [gered/clj-browserchannel-jetty-adapter "0.0.9"]
                   [gered/clj-browserchannel-immutant-adapter "0.0.1"]
+                  [org.immutant/web "2.1.4"]
                   [environ "1.0.3"]]
 
   :plugins       [[lein-cljsbuild "1.1.3"]
