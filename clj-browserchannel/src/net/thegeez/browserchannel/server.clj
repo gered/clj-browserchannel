@@ -555,7 +555,7 @@
 (defn disconnect!
   [session-id & [reason]]
   (if-let [session-agent (get @sessions session-id)]
-    (send-off session-agent close nil (or reason "Disconnected"))))
+    (send-off session-agent close nil (or reason "Client disconnected by server"))))
 
 ;; wrap the respond function from :reactor with the proper
 ;; responsewrapper for either IE or other clients
@@ -659,7 +659,7 @@
      ;; this is a request made in an img tag
      (do ;;end session
        (when session-agent
-         (send-off session-agent close req "Disconnected"))
+         (send-off session-agent close req "Client disconnected"))
        {:status 200
         :headers (:headers options)
         :body ""}
