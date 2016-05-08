@@ -4,15 +4,19 @@
     [immutant.web.async :as iasync]
     [net.thegeez.browserchannel.async-adapter :as bc-async-adapter]))
 
-(deftype ImmutantResponse [channel]
+(deftype ImmutantResponse
+  [channel]
   bc-async-adapter/IAsyncAdapter
+
   (head [this status headers]
     (let [headers (assoc headers "Transfer-Encoding" "chunked")]
       (iasync/send! channel {:status status :headers headers})))
+
   (write-chunk [this data]
     (if (iasync/open? channel)
       (iasync/send! channel data)
       (throw bc-async-adapter/ConnectionClosedException)))
+
   (close [this]
     (iasync/close channel)))
 
