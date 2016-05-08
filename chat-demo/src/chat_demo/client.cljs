@@ -12,9 +12,7 @@
   (browserchannel/send-map {:msg text}))
 
 (defn toggle-element [elem]
-  (if (dom/attr elem :disabled)
-    (dom/remove-attr! elem :disabled)
-    (dom/set-attr! elem :disabled)))
+  (dom/toggle-attr! elem :disabled (not (dom/attr elem :disabled))))
 
 (def handler
   {:on-open
@@ -45,9 +43,4 @@
                         (dom/set-text! (str "MSG::" msg))))))})
 
 (defn ^:export run []
-  (events/listen
-    js/window "unload"
-    (fn []
-      (events/removeAll)))
-
   (browserchannel/init! handler))
