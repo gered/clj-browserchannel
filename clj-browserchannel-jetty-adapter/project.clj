@@ -1,8 +1,8 @@
-(defproject gered/clj-browserchannel-jetty-adapter "0.0.9"
+(defproject gered/clj-browserchannel-jetty-adapter "0.1.0"
   :description "Jetty async adapter for BrowserChannel"
   :dependencies [[ring/ring-core "1.4.0"]
                  [ring/ring-servlet "1.4.0"]
-                 [org.eclipse.jetty/jetty-server "8.1.16.v20140903"];; includes ssl
+                 [ring/ring-jetty-adapter "1.4.0"]
                  [gered/clj-browserchannel "0.3"]]
   :profiles {:provided
               {:dependencies

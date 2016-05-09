@@ -44,7 +44,7 @@
 
 (defn run-jetty []
   (println "Using Jetty adapter")
-  (jetty/run-jetty-async
+  (jetty/run-jetty
     #'handler
     {:join? false
      :port  8080}))
@@ -58,7 +58,7 @@
 (defn -main [& args]
   (if (env :dev) (pebble/set-options! :cache false))
 
-  ;(run-jetty)
-  (run-immutant)
+  (run-jetty)
+  ;(run-immutant)
 
   )
