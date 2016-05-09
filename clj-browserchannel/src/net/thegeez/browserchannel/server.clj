@@ -14,22 +14,7 @@
 ;; @todo session-timeout should deduct waiting time for the failed
 ;; sent heartbeat?
 
-(def default-options
-  {;; a.example, b.example => ["a","b"]
-   :host-prefixes [] 
-   ;; straight from google
-   :headers {"Content-Type" "text/plain"
-             "Cache-Control" "no-cache, no-store, max-age=0, must-revalidate"
-             "Pragma" "no-cache"
-             "Expires" "Fri, 01 Jan 1990 00:00:00 GMT"
-             "X-Content-Type-Options" "nosniff"}
-   :base "/channel" ;; root for /test and /bind urls
-   :keep-alive-interval 30  ;; seconds, keep less than session-time-out
-   :session-timeout-interval 120 ;; seconds
-   ;; after this number of bytes a
-   ;; backchannel will always be closed
-   :data-threshold (* 10 1024) 
-   })
+
 
 
 (def ^:private noop-string "[\"noop\"]")
@@ -606,23 +591,42 @@
                                  flush-buffer))))
 
 (defn send-map
-  [session-id map]
-  (send-string session-id (json/write-str map)))
+  "sends a map to the client identified by session-id over the backchannel.
+   if there is currently no available backchannel for this client, the data
+   is queued until one is available."
+  [session-id m]
+  (send-string session-id (json/write-str m)))
 
 (defn send-map-to-all
+  "sends a map to all currently connected clients over their backchannels."
   [m]
   (doseq [[session-id _] @sessions]
     (send-map session-id m)))
 
 (defn connected?
+  "returns true if a client with the given session-id is currently connected."
   [session-id]
   (contains? @sessions session-id))
 
 (defn disconnect!
+  "disconnects the client identified by session-id."
   [session-id & [reason]]
   (if-let [session-agent (get @sessions session-id)]
     (send-off session-agent close nil (or reason "Client disconnected by server"))))
 
+(defn get-status
+  "returns connection status info about the client identified by session-id"
+  [session-id]
+  (if (connected? session-id)
+    (let [session-agent    (get @sessions session-id)
+          status           (session-status session-agent)
+          has-back-channel (first status)]
+      {:connected?                    true
+       :address                       (:address session-agent)
+       :app-version                   (:app-version session-agent)
+       :has-back-channel?             (if (= 1 has-back-channel) true false)
+       :last-acknowledged-array-id    (second status)
+       :outstanding-backchannel-bytes (nth status 2)})))
 
 
 
@@ -760,9 +764,68 @@
           :post (handle-forward-channel req session-agent options)
           :get (handle-backward-channel req session-agent options))))))
 
+;; straight from google
+(def standard-headers
+  {"Content-Type" "text/plain"
+   "Cache-Control" "no-cache, no-store, max-age=0, must-revalidate"
+   "Pragma" "no-cache"
+   "Expires" "Fri, 01 Jan 1990 00:00:00 GMT"
+   "X-Content-Type-Options" "nosniff"})
 
-;; see default-options for describtion of options
+(def default-options
+  "default options that will be applied by wrap-browserchannel unless
+   overridden."
+  {
+   ;; list of extra subdomain prefixes on which clients can connect
+   ;; e.g. a.example, b.example => ["a","b"]
+   :host-prefixes            []
+
+   ;; additional response headers. should probably always include
+   ;; net.thegeez.browserchannel.server/standard-headers if you
+   ;; change this
+   :headers                  standard-headers
+
+   ;; base/root url on which to bind the '/test' and '/bind' routes to
+   :base                     "/channel"
+
+   ;; interval at which keepalive responses are sent to help ensure
+   ;; that clients don't close connections early. specified in
+   ;; seconds. keep less then session-timeout-interval
+   :keep-alive-interval      30
+
+   ;; seconds to wait without any client activity before the
+   ;; connection is closed.
+   :session-timeout-interval 120
+
+   ;; number of bytes that can be sent over a single backchannel
+   ;; connection before it is forced closed (at which point the
+   ;; client will open a new one)
+   :data-threshold           (* 10 1024)
+   })
+
+
 (defn wrap-browserchannel
+  "adds browserchannel support to a ring handler.
+
+   the most important option that all applications will want to provide
+   is :events. this should be a map of event handler functions:
+
+   {:on-open    (fn [session-id request] ...)
+    :on-close   (fn [session-id request reason] ...)
+    :on-receive (fn [session-id request data] ...)}
+
+   :on-open is called when new client browserchannel sessions are created.
+   :on-close is called when clients disconnect.
+   :on-receive is called when data is received from the client via the
+   forward channel.
+
+   for all events, request is a Ring request map and can be used to access
+   up to date cookie or (http) session data, or other client info. you
+   cannot use these event handlers to update the client's (http) session
+   data as no response is returned via these event handler functions.
+
+   for other supported options, see
+   net.thegeez.browserchannel.server/default-options"
   [handler & [options]]
   (let [options (merge default-options options)
         base    (str (:base options))]
