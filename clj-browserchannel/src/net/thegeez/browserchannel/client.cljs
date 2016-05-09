@@ -48,11 +48,10 @@
 
 (defn decode-queued-map
   [queued-map]
-  (let [m    (js->clj queued-map)
-        data (get m "map")]
-    (merge
-      {:context (get m "context")
-       :map-id  (get m "mapId")}
+  (merge
+    {:context (aget queued-map "context")
+     :map-id  (aget queued-map "mapId")}
+    (let [data (js->clj (aget queued-map "map"))]
       (if (contains? data "__edn")
         {:data (reader/read-string (str (get data "__edn")))}
         {:map data}))))
