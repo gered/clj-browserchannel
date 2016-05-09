@@ -618,15 +618,16 @@
   "returns connection status info about the client identified by session-id"
   [session-id]
   (if (connected? session-id)
-    (let [session-agent    (get @sessions session-id)
+    (let [session-agent    @(get @sessions session-id)
           status           (session-status session-agent)
           has-back-channel (first status)]
-      {:connected?                    true
-       :address                       (:address session-agent)
-       :app-version                   (:app-version session-agent)
-       :has-back-channel?             (if (= 1 has-back-channel) true false)
-       :last-acknowledged-array-id    (second status)
-       :outstanding-backchannel-bytes (nth status 2)})))
+      (merge
+        {:connected?                    true
+         :has-back-channel?             (if (= 1 has-back-channel) true false)
+         :last-acknowledged-array-id    (second status)
+         :outstanding-backchannel-bytes (nth status 2)}
+        (select-keys (:details session-agent) [:address :headers])))
+    {:connected? false}))
 
 
 
