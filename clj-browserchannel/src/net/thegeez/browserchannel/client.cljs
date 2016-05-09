@@ -116,7 +116,9 @@
     (set! (.-channelSuccess handler)
           (fn [ch delivered]
             (if on-sent
-              (on-sent (decode-queued-map-array delivered)))
+              (let [decoded (decode-queued-map-array delivered)]
+                (if (seq decoded)
+                  (on-sent decoded))))
             (doseq [m delivered]
               (let [{:keys [on-success] :as context} (aget m "context")]
                 (if on-success
