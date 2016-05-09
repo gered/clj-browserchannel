@@ -196,13 +196,13 @@
     :on-sent    (fn [delivered] ...)
     :on-error   (fn [error-code] ...)
 
-    :on-open is called when a connection is (re-)established.
-    :on-close is called when a connection is closed.
-    :on-receive is called when data is received from the server.
-    :on-sent is called when data has been successfully sent to
-    the server ('delivered' is a list of what was sent).
-    :on-error is only invoked once just before the connection is
-    closed, and only if there was an error."
+   :on-open is called when a connection is (re-)established.
+   :on-close is called when a connection is closed.
+   :on-receive is called when data is received from the server.
+   :on-sent is called when data has been successfully sent to
+   the server ('delivered' is a list of what was sent).
+   :on-error is only invoked once just before the connection is
+   closed, and only if there was an error."
   [handler & [options]]
   (let [options (merge default-options options)]
     (events/listen js/window "unload" #(disconnect!))

@@ -21,6 +21,8 @@
     (iasync/close channel)))
 
 (defn wrap-immutant-async-adapter
+  "wraps the ring handler with an async adapter necessary for
+   browserchannel sessions."
   [handler]
   (fn [request]
     (let [resp (handler request)]
@@ -35,7 +37,15 @@
 
         resp))))
 
-(defn run-immutant [handler options]
+(defn run-immutant
+  "convenience function for wrapping a ring handler with the necessary
+   immutant async adapter and also starting up an immutant server
+   at the same time. many applications may want to just directly
+   use wrap-immutant-async-adapter instead and not use this function.
+
+   options is passed directly to immutant. see immutant.web/run
+   for a description of the available options."
+  [handler options]
   (-> handler
       (wrap-immutant-async-adapter)
       (iweb/run options)))
