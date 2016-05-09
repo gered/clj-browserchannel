@@ -3,8 +3,9 @@
   (:import
     [java.util.concurrent ScheduledExecutorService Executors TimeUnit Callable ScheduledFuture])
   (:require
-    [ring.middleware.params :as params]
+    [clojure.edn :as edn]
     [clojure.data.json :as json]
+    [ring.middleware.params :as params]
     [net.thegeez.browserchannel.async-adapter :as async-adapter]))
 
 ;; @todo: out of order acks and maps - AKH the maps at least is taken care of.
@@ -138,6 +139,16 @@
 (defn- to-pair
   [p]
   (str "[" (first p) "," (second p) "]"))
+
+(defn- decode-map
+  [m]
+  (if (contains? m "__edn")
+    (edn/read-string (get m "__edn"))
+    m))
+
+(defn- encode-map
+  [data]
+  {"__edn" (pr-str data)})
 
 ;;;;;; end of utils
 
@@ -583,25 +594,27 @@
 ;; convience function to send data to a session
 ;; the data will be queued until there is a backchannel to send it
 ;; over
-(defn- send-string
-  [session-id string]
+(defn- send-map
+  [session-id m]
   (when-let [session-agent (get @sessions session-id)]
-    (send-off session-agent #(-> %
-                                 (queue-string string)
-                                 flush-buffer))))
+    (let [string (json/write-str m)]
+      (send-off session-agent #(-> %
+                                   (queue-string string)
+                                   flush-buffer)))))
 
-(defn send-map
-  "sends a map to the client identified by session-id over the backchannel.
+(defn send-data
+  "sends data to the client identified by session-id over the backchannel.
    if there is currently no available backchannel for this client, the data
    is queued until one is available."
-  [session-id m]
-  (send-string session-id (json/write-str m)))
+  [session-id data]
+  (if data
+    (send-map session-id (encode-map data))))
 
-(defn send-map-to-all
-  "sends a map to all currently connected clients over their backchannels."
-  [m]
+(defn send-data-to-all
+  "sends data to all currently connected clients over their backchannels."
+  [data]
   (doseq [[session-id _] @sessions]
-    (send-map session-id m)))
+    (send-data session-id data)))
 
 (defn connected?
   "returns true if a client with the given session-id is currently connected."
@@ -714,8 +727,9 @@
       ;; backchannelPresent = 0 for false, 1 for true
       ;; send as json for XHR and IE
       (do
-        (doseq [map maps]
-          (notify-listeners (:id @session-agent) req :map map))
+        (doseq [m maps]
+          (let [decoded (decode-map m)]
+            (notify-listeners (:id @session-agent) req :map decoded)))
         (let [status (session-status @session-agent)]
           {:status  200
            :headers (:headers options)

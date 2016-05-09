@@ -9,7 +9,7 @@
 (enable-console-print!)
 
 (defn say [text]
-  (browserchannel/send-map {:msg text}))
+  (browserchannel/send-data {:msg text}))
 
 (defn toggle-element [elem]
   (dom/toggle-attr! elem :disabled (not (dom/attr elem :disabled))))
@@ -37,10 +37,9 @@
 
    :on-receive
    (fn [data]
-     (let [msg (get data "msg")]
-       (dom/append! (by-id "room")
-                    (-> (dom/create-element "div")
-                        (dom/set-text! (str "MSG::" msg))))))})
+     (dom/append! (by-id "room")
+                  (-> (dom/create-element "div")
+                      (dom/set-text! (str "MSG::" (:msg data))))))})
 
 (defn ^:export run []
   (browserchannel/init! event-handlers))

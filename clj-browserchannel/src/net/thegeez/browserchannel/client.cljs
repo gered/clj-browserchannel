@@ -1,5 +1,6 @@
 (ns net.thegeez.browserchannel.client
   (:require
+    [cljs.reader :as reader]
     [dommy.core :refer-macros [sel1]]
     goog.net.BrowserChannel
     goog.net.BrowserChannel.Handler
@@ -33,15 +34,32 @@
    11 :bad-response
    12 :active-x-blocked})
 
-(defn- queued-map->clj
-  [queued-map]
-  {:context (aget queued-map "context")
-   :map     (js->clj (aget queued-map "map"))
-   :map-id  (aget queued-map "mapId")})
+(defn encode-map
+  [data]
+  (doto (js-obj)
+    (aset "__edn" (pr-str data))))
 
-(defn- array-of-queued-map->clj
+(defn decode-map
+  [m]
+  (let [m (js->clj m)]
+    (if (contains? m "__edn")
+      (reader/read-string (str (get m "__edn")))
+      m)))
+
+(defn decode-queued-map
+  [queued-map]
+  (let [m    (js->clj queued-map)
+        data (get m "map")]
+    (merge
+      {:context (get m "context")
+       :map-id  (get m "mapId")}
+      (if (contains? data "__edn")
+        {:data (reader/read-string (str (get data "__edn")))}
+        {:map data}))))
+
+(defn decode-queued-map-array
   [queued-map-array]
-  (mapv queued-map->clj queued-map-array))
+  (mapv decode-queued-map queued-map-array))
 
 (defn channel-state []
   (.getState channel))
@@ -56,9 +74,10 @@
     (.setLevel level)
     (.addHandler (or f #(js/console.log %)))))
 
-(defn send-map
-  [m & [{:keys [on-success]}]]
-  (.sendMap channel (clj->js m) {:on-success on-success}))
+(defn send-data
+  [data & [{:keys [on-success]}]]
+  (if data
+    (.sendMap channel (encode-map data) {:on-success on-success})))
 
 (defn connect!
   [& [{:keys [base] :as options}]]
@@ -89,16 +108,16 @@
     (set! (.-channelClosed handler)
           (fn [ch pending undelivered]
             (if on-close
-              (on-close (array-of-queued-map->clj pending)
-                        (array-of-queued-map->clj undelivered)))))
+              (on-close (decode-queued-map-array pending)
+                        (decode-queued-map-array undelivered)))))
     (set! (.-channelHandleArray handler)
           (fn [ch m]
             (if on-receive
-              (on-receive (js->clj m)))))
+              (on-receive (decode-map m)))))
     (set! (.-channelSuccess handler)
           (fn [ch delivered]
             (if on-sent
-              (on-sent (array-of-queued-map->clj delivered)))
+              (on-sent (decode-queued-map-array delivered)))
             (doseq [m delivered]
               (let [{:keys [on-success] :as context} (aget m "context")]
                 (if on-success
