@@ -600,7 +600,8 @@
     (let [string (json/write-str m)]
       (send-off session-agent #(-> %
                                    (queue-string string)
-                                   flush-buffer)))))
+                                   flush-buffer))
+      string)))
 
 (defn send-data
   "sends data to the client identified by session-id over the backchannel.
