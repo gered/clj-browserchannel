@@ -58,7 +58,7 @@
 (defn -main [& args]
   (if (env :dev) (pebble/set-options! :cache false))
 
-  (run-jetty)
-  ;(run-immutant)
+  ;(run-jetty)
+  (run-immutant)
 
   )

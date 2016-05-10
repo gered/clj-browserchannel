@@ -12,7 +12,7 @@
                   [prismatic/dommy "1.1.0"]
                   [gered/clj-browserchannel "0.3"]
                   [gered/clj-browserchannel-jetty-adapter "0.1.0"]
-                  [gered/clj-browserchannel-immutant-adapter "0.0.1"]
+                  [gered/clj-browserchannel-immutant-adapter "0.0.2"]
                   [org.immutant/web "2.1.4"]
                   [environ "1.0.3"]]
 

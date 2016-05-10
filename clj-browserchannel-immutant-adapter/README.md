@@ -1,9 +1,13 @@
 # clj-browserchannel-immutant-adapter
 
-Immutant async adapter for BrowserChannel
+Immutant async adapter for BrowserChannel.
 
 See also: [clj-browserchannel][1]
 [1]:https://github.com/gered/clj-browserchannel
+
+## Leiningen
+
+    [gered/clj-browserchannel-immutant-adapter "0.0.1"]
 
 ## About
 

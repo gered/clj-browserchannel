@@ -22,14 +22,22 @@
 
 (defn wrap-immutant-async-adapter
   "wraps the ring handler with an async adapter necessary for
-   browserchannel sessions."
-  [handler]
+   browserchannel sessions.
+
+   options available:
+
+   :response-timeout - Timeout after which the server will close the
+                       connection. Specified in milliseconds, default
+                       is 4 minutes which is the timeout period Google
+                       uses."
+  [handler & [options]]
   (fn [request]
     (let [resp (handler request)]
       (if (= :http (:async resp))
         (iasync/as-channel
           request
-          {:on-open
+          {:timeout (get options :response-timeout (* 4 60 1000))
+           :on-open
            (fn [channel]
              (let [reactor (:reactor resp)
                    emit    (ImmutantResponse. channel)]
@@ -44,8 +52,15 @@
    use wrap-immutant-async-adapter instead and not use this function.
 
    options is passed directly to immutant. see immutant.web/run
-   for a description of the available options."
+   for a description of the available options.
+
+   some additional options used by the async adapter are available:
+
+   :response-timeout - Timeout after which the server will close the
+                       connection. Specified in milliseconds, default
+                       is 4 minutes which is the timeout period Google
+                       uses."
   [handler options]
   (-> handler
-      (wrap-immutant-async-adapter)
+      (wrap-immutant-async-adapter options)
       (iweb/run options)))

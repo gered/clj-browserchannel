@@ -1,4 +1,4 @@
-(defproject gered/clj-browserchannel-immutant-adapter "0.0.1"
+(defproject gered/clj-browserchannel-immutant-adapter "0.0.2"
   :description "Immutant async adapter for BrowserChannel"
   :dependencies [[gered/clj-browserchannel "0.3"]]
   :profiles {:provided
