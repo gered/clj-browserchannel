@@ -4,7 +4,7 @@
     [java.util.concurrent ScheduledExecutorService Executors TimeUnit Callable ScheduledFuture])
   (:require
     [clojure.edn :as edn]
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [ring.middleware.params :as params]
     [net.thegeez.browserchannel.async-adapter :as async-adapter]))
 
@@ -231,7 +231,7 @@
     (async-adapter/head respond 200 (merge headers ie-headers))
     (async-adapter/write-chunk respond "<html><body>\n")
     (when (seq domain)
-      (async-adapter/write-chunk respond (str "<script>try{document.domain=\"" (pr-str (json/write-str domain)) "\";}catch(e){}</script>\n"))))
+      (async-adapter/write-chunk respond (str "<script>try{document.domain=\"" (pr-str (json/generate-string domain)) "\";}catch(e){}</script>\n"))))
 
   (write [this data]
     (async-adapter/write-chunk respond (str "<script>try {parent.m(" (pr-str data) ")} catch(e) {}</script>\n"))
@@ -597,7 +597,7 @@
 (defn- send-map
   [session-id m]
   (when-let [session-agent (get @sessions session-id)]
-    (let [string (json/write-str m)]
+    (let [string (json/generate-string m)]
       (send-off session-agent #(-> %
                                    (queue-string string)
                                    flush-buffer))
@@ -684,7 +684,7 @@
                           (rand-nth prefixes))]
         {:status  200
          :headers (assoc (:headers options) "X-Accept" "application/json; application/x-www-form-urlencoded")
-         :body    (json/write-str [host-prefix, nil])})
+         :body    (json/generate-string [host-prefix, nil])})
 
       ;; else phase 2 for get /test
       ;; client checks if connection is buffered
@@ -720,7 +720,7 @@
             host-prefix nil]
         {:status  200
          :headers (assoc (:headers options) "Content-Type" "application/javascript")
-         :body    (size-json-str (json/write-str [[0, ["c", session-id, host-prefix, 8]]]))})
+         :body    (size-json-str (json/generate-string [[0, ["c", session-id, host-prefix, 8]]]))})
       ;; For existing sessions:
       ;; Forward sent data by client to listeners
       ;; reply with
@@ -734,7 +734,7 @@
         (let [status (session-status @session-agent)]
           {:status  200
            :headers (:headers options)
-           :body    (size-json-str (json/write-str status))})))))
+           :body    (size-json-str (json/generate-string status))})))))
 
 ;; GET req server->client is a backwardchannel opened by client
 (defn- handle-backward-channel
