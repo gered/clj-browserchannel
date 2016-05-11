@@ -290,6 +290,7 @@
                                               (= string noop-string))
                                             to-flush))
                               clojure.lang.PersistentQueue/EMPTY)]))
+
   (last-acknowledged-id [this]
     last-acknowledged-id)
 
@@ -317,7 +318,7 @@
 
   ;; messages sent from server to client are arrays
   ;; the client acknowledges received arrays when creating a new backwardchannel
-  (acknowledge-arrays [this array-id])
+  (acknowledge-arrays [this array-id-str])
 
   (queue-string [this json-string])
 
@@ -454,8 +455,8 @@
   (queue-string [this json-string]
     (update-in this [:array-buffer] queue json-string))
 
-  (acknowledge-arrays [this array-id]
-    (let [array-id (Long/parseLong array-id)]
+  (acknowledge-arrays [this array-id-str]
+    (let [array-id (Long/parseLong array-id-str)]
       (update-in this [:array-buffer] acknowledge-id array-id)))
 
   ;; tries to do the actual writing to the client
@@ -470,7 +471,7 @@
           ;; buffer contains [[1 json-str] ...] can't use
           ;; json-str which will double escape the json
 
-          (doseq [p to-flush #_(next to-flush)]
+          (doseq [p to-flush]
             (write (:respond back-channel) (str "[" (to-pair p) "]")))
 
           ;; size is an approximation
