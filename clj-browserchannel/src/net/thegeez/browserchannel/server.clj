@@ -317,9 +317,9 @@
 
   ;; messages sent from server to client are arrays
   ;; the client acknowledges received arrays when creating a new backwardchannel
-  (acknowledge-arrays [this array-ids])
+  (acknowledge-arrays [this array-id])
 
-  (queue-string [this string])
+  (queue-string [this json-string])
 
   ;; heartbeat is a timer to send noop over the backward channel
   (clear-heartbeat [this])
@@ -451,8 +451,8 @@
                      (send-off session-agent close nil "Timed out"))
                    (:session-timeout-interval details))))))
 
-  (queue-string [this string]
-    (update-in this [:array-buffer] queue string))
+  (queue-string [this json-string]
+    (update-in this [:array-buffer] queue json-string))
 
   (acknowledge-arrays [this array-id]
     (let [array-id (Long/parseLong array-id)]
