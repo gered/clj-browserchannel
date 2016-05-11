@@ -52,23 +52,8 @@
   (let [size (alength (.getBytes json "UTF-8"))]
     (str size "\n" json)))
 
-;; make sure the root URI for channels starts with a / for route matching
-(defn- standard-base
-  [s]
-  (let [wofirst (if (= \/ (first s))
-                  (apply str (rest s))
-                  s)
-        wolast  (if (= \/ (last wofirst))
-                  (apply str (butlast wofirst))
-                  wofirst)]
-    (str "/" wolast)))
-
-;; @todo to test file
-#_(assert (= (repeat 4 "/foo")
-           (map standard-base ["foo" "/foo" "foo/" "/foo"])))
-
 ;; type preserving drop upto for queueus
-(defn- drop-queue
+(defn drop-queue
   [queue id]
   (let [head (peek queue)]
     (if-not head
@@ -80,7 +65,7 @@
         
 ;; Key value pairs do not always come ordered by request number.
 ;; E.g. {req0_key1 val01, req1_key1 val11, req0_key2 val02, req1_key2 val12}
-(defn- transform-url-data
+(defn transform-url-data
   [data]
   (let [ofs    (get data "ofs" "0")
         pieces (dissoc data "count" "ofs")]
@@ -92,12 +77,6 @@
                 (sort-by first)   ;; order by request number so that messages are recieved on server in same order
                 (map #(into {} (map second (val %)))))}))
 
-#_(assert (= {:ofs 0 :maps [{"x" "3" "y" "10"} {"abc" "def"}]}
-           (transform-url-data {"count" "2"
-                                "ofs" "0"
-                                "req0_x" "3"
-                                "req0_y" "10"
-                                "req1_abc" "def"})))
 ;; maps are URL Encoded
 ;;;; URL Encoded data:
 ;;{ count: '2',
@@ -114,7 +93,7 @@
 ;; "req1_abc" "def"}
 ;; => 
 ;;{:ofs 0 :maps [{"x" "3" "y" "10"},{"abc": "def"}]}
-(defn- get-maps
+(defn get-maps
   [req]
   (let [data (:form-params req)]
     (when-not (zero? (count data))
@@ -140,13 +119,13 @@
   [p]
   (str "[" (first p) "," (second p) "]"))
 
-(defn- decode-map
+(defn decode-map
   [m]
   (if (contains? m "__edn")
     (edn/read-string (get m "__edn"))
     m))
 
-(defn- encode-map
+(defn encode-map
   [data]
   {"__edn" (pr-str data)})
 
