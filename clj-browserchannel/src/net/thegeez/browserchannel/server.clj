@@ -619,7 +619,7 @@
           has-back-channel (first status)]
       (merge
         {:connected?                    true
-         :has-back-channel?             (if (= 1 has-back-channel) true false)
+         :has-back-channel?             (= 1 has-back-channel)
          :last-acknowledged-array-id    (second status)
          :outstanding-backchannel-bytes (nth status 2)}
         (select-keys (:details session-agent) [:address :headers])))
