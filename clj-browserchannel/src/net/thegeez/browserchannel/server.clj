@@ -304,7 +304,7 @@
 
 
 ;; {sessionId -> (agent session)}
-(def ^:private sessions (atom {}))
+(def sessions (atom {}))
 
 ;; All methods meant to be fn send to an agent, therefor all need to return a Session
 (defprotocol ISession
