@@ -9,6 +9,7 @@
                [org.clojure/clojurescript "1.8.51"]]}
 
              :dev
-             {:dependencies [[pjstadig/humane-test-output "0.8.0"]]
+             {:dependencies [[pjstadig/humane-test-output "0.8.0"]
+                             [ring/ring-mock "0.3.0"]]
               :injections   [(require 'pjstadig.humane-test-output)
                              (pjstadig.humane-test-output/activate!)]}})
