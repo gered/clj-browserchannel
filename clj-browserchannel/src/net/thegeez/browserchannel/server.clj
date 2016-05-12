@@ -745,10 +745,14 @@
   [req options]
   (let [SID           (get-in req [:query-params "SID"])
         ;; session-agent might be nil, then it will be created by
-        ;; handle-forward-channel
+        ;; handle-forward-channel.
+        ;; however, we must have a non-nil session-agent (and hence, a
+        ;; pre-existing session) for all invocations of handle-backward-channel
         session-agent (@sessions SID)]
-    (if (and SID
-             (not session-agent))
+    (if (or (and (= :get (:request-method req))
+                 (not session-agent))
+            (and SID
+                 (not session-agent)))
       ;; SID refers to an already created session, which therefore
       ;; must exist
       (error-response 400 "Unknown SID")
