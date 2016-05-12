@@ -532,28 +532,30 @@
                          :heartbeat-interval       (:keep-alive-interval options)
                          :session-timeout-interval (:session-timeout-interval options)
                          :data-threshold           (:data-threshold options)}
-          session       (-> (Session. id
-                                      details
-                                      nil ;; backchannel
-                                      (ArrayBuffer.
-                                        0 ;; array-id, 0 is never used by the
-                                          ;; array-buffer, it is used by the
-                                          ;; first message with the session id
-                                        0 ;; last-acknowledged-id
-                                          ;; to-acknowledge-arrays
-                                        clojure.lang.PersistentQueue/EMPTY
-                                          ;; to-flush-arrays
-                                        clojure.lang.PersistentQueue/EMPTY)
-                                      nil ;; heartbeat-timeout
-                                      nil ;; session-timeout
-                                      )
-                            ;; this first session-timeout is for the case
-                            ;; when the client never connects with a backchannel
-                            refresh-session-timeout)
+          session       (Session. id
+                                  details
+                                  nil ;; backchannel
+                                  (ArrayBuffer.
+                                    0 ;; array-id, 0 is never used by the
+                                    ;; array-buffer, it is used by the
+                                    ;; first message with the session id
+                                    0 ;; last-acknowledged-id
+                                    ;; to-acknowledge-arrays
+                                    clojure.lang.PersistentQueue/EMPTY
+                                    ;; to-flush-arrays
+                                    clojure.lang.PersistentQueue/EMPTY)
+                                  nil ;; heartbeat-timeout
+                                  nil ;; session-timeout
+                                  )
           session-agent (agent session)]
       (set-error-handler! session-agent (agent-error-handler-fn (str "session-" (:id session))))
       (set-error-mode! session-agent :continue)
+      ;; add new session-agent to our list of active browserchannel sessions
       (swap! sessions assoc id session-agent)
+      ;; this first session-timeout is for the case
+      ;; when the client never connects with a backchannel
+      (send-off session-agent refresh-session-timeout)
+      ;; register application-level browserchannel session events
       (let [{:keys [on-open on-close on-receive]} (:events options)]
         (if on-close (add-listener id :close on-close))
         (if on-receive (add-listener id :map on-receive))
