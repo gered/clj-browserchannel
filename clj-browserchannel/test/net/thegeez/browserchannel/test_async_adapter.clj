@@ -19,7 +19,7 @@
   (reset! async-output {})
   (f))
 
-(deftype TestResponse
+(deftype TestAsyncResponse
   [write-fn closed?-fn]
   bc-async-adapter/IAsyncAdapter
 
@@ -41,7 +41,7 @@
     (let [resp (handler request)]
       (if (= :http (:async resp))
         (let [reactor (:reactor resp)
-              emit    (TestResponse. write-async-output! closed-async-output?)]
+              emit    (TestAsyncResponse. write-async-output! closed-async-output?)]
           (reactor emit)
           {:status 200})
         resp))))

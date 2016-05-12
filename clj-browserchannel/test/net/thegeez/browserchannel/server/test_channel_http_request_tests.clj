@@ -1,4 +1,4 @@
-(ns net.thegeez.browserchannel.server.http-request-tests
+(ns net.thegeez.browserchannel.server.test-channel-http-request-tests
   (:use
     clojure.test
     net.thegeez.browserchannel.common
