@@ -1,5 +1,6 @@
 (ns net.thegeez.browserchannel.common
   (:require
+    [clojure.edn :as edn]
     [clojure.string :as string]
     [cheshire.core :as json]))
 
@@ -39,6 +40,16 @@
           (string/split x #"\d+\n")
           (remove string/blank? x)
           (mapv json/parse-string x))))
+
+(defn get-raw-from-arrays
+  [arrays idx]
+  (-> (get arrays idx) first second))
+
+(defn get-edn-from-arrays
+  [arrays idx]
+  (-> (get-raw-from-arrays arrays idx)
+      (get "__edn")
+      (edn/read-string)))
 
 ;; HACK: sleep for an arbitrary period that is based off me throwing in a
 ;;       random "feels good" number in there... i think this says it all, really

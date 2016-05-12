@@ -168,6 +168,25 @@
       (is (= (-> arrays ffirst second (get "__edn") (edn/read-string))
              {:foo "bar"})))))
 
+(deftest backchannel-request-send-multiple-data-to-client-test
+  (let [options     (update-in default-options [:headers] dissoc "Content-Type")
+        create-resp (app (->new-session-request) options)
+        session-id  (get-session-id create-resp)
+        back-resp   (app (->new-backchannel-request session-id))]
+    (send-data session-id {:foo "bar"})
+    (send-data session-id "hello, world")
+    (wait-for-agent-send-offs)
+    (let [async-resp @async-output
+          arrays     (get-response-arrays (:body async-resp))]
+      (is (= 200 (:status back-resp)))
+      (is (= 200 (:status async-resp)))
+      (is (not (:closed? async-resp)))
+      (is (contains-all-of? (:headers async-resp) (:headers options)))
+      (is (= (get-edn-from-arrays arrays 0)
+             {:foo "bar"}))
+      (is (= (get-edn-from-arrays arrays 1)
+             "hello, world")))))
+
 (deftest backchannel-request-heartbeat-test
   (let [options     (-> default-options
                         (update-in [:headers] dissoc "Content-Type")
@@ -183,5 +202,5 @@
       (is (= 200 (:status async-resp)))
       (is (not (:closed? async-resp)))
       (is (contains-all-of? (:headers async-resp) (:headers options)))
-      (is (= (-> arrays ffirst second)
+      (is (= (get-raw-from-arrays arrays 0)
              ["noop"])))))
