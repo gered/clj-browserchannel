@@ -81,9 +81,7 @@
     ; browserchannel's buffering proxy test is supposed to work by initially sending
     ; "11111", then waits for 2 seconds (without closing the response), then sends
     ; "2" and finally closes the response.
-    ; wait for 3 secs just to be safe
-    (println "*** WAITING 3 SECONDS FOR BUFFERING PROXY TEST RESPONSE TO FINISH ***")
-    (Thread/sleep 3000)
+    (wait-for-scheduled-interval 2)
     (let [async-resp @async-output]
       (is (:closed? async-resp))
       (is (= "111112" (:body async-resp))))))

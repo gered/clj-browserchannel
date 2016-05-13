@@ -52,8 +52,7 @@
     (let [arrays (get-response-arrays (:body resp))
           [[id [c session-id host-prefix version]]] (first arrays)]
       (is (= "c" c))
-      (is (and (string? session-id)
-               (not (string/blank? session-id))))
+      (is (session-id-string? session-id))
       (is (nil? host-prefix))
       (is (= protocol-version version))
       (is (get @sessions session-id))
@@ -107,8 +106,7 @@
   (let [arrays (get-response-arrays (:body new-session-response))
         [[_ [c session-id _ _]]] (first arrays)]
     (is (= "c" c))
-    (is (and (string? session-id)
-             (not (string/blank? session-id))))
+    (is (session-id-string? session-id))
     session-id))
 
 (deftest backchannel-request-test
@@ -195,7 +193,7 @@
         create-resp (app (->new-session-request) options)
         session-id  (get-session-id create-resp)
         back-resp   (app (->new-backchannel-request session-id))]
-    (wait-for-heartbeat-interval (:keep-alive-interval options))
+    (wait-for-scheduled-interval (:keep-alive-interval options))
     (let [async-resp @async-output
           arrays     (get-response-arrays (:body async-resp))]
       (is (= 200 (:status back-resp)))

@@ -57,6 +57,13 @@
   []
   (Thread/sleep 500))
 
-(defn wait-for-heartbeat-interval
+(defn wait-for-scheduled-interval
   [secs]
+  ; add 1 extra second just to be 100% safe
+  ; (intervals specified to scheduled job/task timers are never _exact_)
   (Thread/sleep (+ 1000 (* 1000 secs))))
+
+(defn session-id-string?
+  [s]
+  (and (string? s)
+       (not (string/blank? s))))
