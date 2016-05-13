@@ -19,6 +19,8 @@
 
 
 
+(def protocol-version 8)
+
 (def ^:private noop-string "[\"noop\"]")
 
 ;; almost all special cases are for making this work with IE
@@ -670,8 +672,8 @@
 ;; and if the connection can support streaming
 (defn- handle-test-channel
   [req options]
-  (if-not (= "8" (get-in req [:query-params "VER"]))
-    (error-response 400 "Version 8 required")
+  (if-not (= (str protocol-version) (get-in req [:query-params "VER"]))
+    (error-response 400 (str "Version " protocol-version " required"))
     ;; phase 1
     ;; client requests [random host-prefix or
     ;; nil,blockedPrefix]
@@ -709,7 +711,7 @@
       ;; first post after a new session is a message with the session
       ;; details.
       ;; response is first array sent for this session:
-      ;; [[0,["c", session-id, host-prefix, version (always 8)]]]
+      ;; [[0,["c", session-id, host-prefix, version (always equal to protocol-version)]]]
       ;; send as json for XHR and IE
       (let [session     @session-agent
             session-id  (:id session)
@@ -717,7 +719,7 @@
             host-prefix nil]
         {:status  200
          :headers (assoc (:headers options) "Content-Type" "application/javascript")
-         :body    (size-json-str (json/generate-string [[0, ["c", session-id, host-prefix, 8]]]))})
+         :body    (size-json-str (json/generate-string [[0, ["c", session-id, host-prefix, protocol-version]]]))})
       ;; For existing sessions:
       ;; Forward sent data by client to listeners
       ;; reply with

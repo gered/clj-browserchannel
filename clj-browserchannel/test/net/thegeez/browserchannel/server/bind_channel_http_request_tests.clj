@@ -40,9 +40,9 @@
         resp    (app (-> (mock/request
                            :post "/channel/bind")
                          (mock/query-string
-                           {"VER"  8
+                           {"VER"  protocol-version
                             "RID"  1
-                            "CVER" 8
+                            "CVER" protocol-version
                             "zx"   (random-string)
                             "t"    1}))
                      options)]
@@ -55,7 +55,7 @@
       (is (and (string? session-id)
                (not (string/blank? session-id))))
       (is (nil? host-prefix))
-      (is (= 8 version))
+      (is (= protocol-version version))
       (is (get @sessions session-id))
       (is (connected? session-id)))))
 
@@ -63,9 +63,9 @@
   (let [resp (app (-> (mock/request
                         :get "/channel/bind")
                       (mock/query-string
-                        {"VER"  8
+                        {"VER"  protocol-version
                          "RID"  "rpc"
-                         "CVER" 8
+                         "CVER" protocol-version
                          "CI"   0
                          "AID"  0
                          "TYPE" "xmlhttp"
@@ -78,10 +78,10 @@
   (let [resp (app (-> (mock/request
                         :get "/channel/bind")
                       (mock/query-string
-                        {"VER"  8
+                        {"VER"  protocol-version
                          "RID"  "rpc"
                          "SID"  "foobar"
-                         "CVER" 8
+                         "CVER" protocol-version
                          "CI"   0
                          "AID"  0
                          "TYPE" "xmlhttp"
@@ -95,9 +95,9 @@
   (-> (mock/request
         :post "/channel/bind")
       (mock/query-string
-        {"VER"  8
+        {"VER"  protocol-version
          "RID"  1
-         "CVER" 8
+         "CVER" protocol-version
          "zx"   (random-string)
          "t"    1})))
 
@@ -118,10 +118,10 @@
         back-resp   (app (-> (mock/request
                                :get "/channel/bind")
                              (mock/query-string
-                               {"VER"  8
+                               {"VER"  protocol-version
                                 "RID"  "rpc"
                                 "SID"  session-id
-                                "CVER" 8
+                                "CVER" protocol-version
                                 "CI"   0
                                 "AID"  0
                                 "TYPE" "xmlhttp"
@@ -142,10 +142,10 @@
   (-> (mock/request
         :get "/channel/bind")
       (mock/query-string
-        {"VER"  8
+        {"VER"  protocol-version
          "RID"  "rpc"
          "SID"  session-id
-         "CVER" 8
+         "CVER" protocol-version
          "CI"   0
          "AID"  0
          "TYPE" "xmlhttp"

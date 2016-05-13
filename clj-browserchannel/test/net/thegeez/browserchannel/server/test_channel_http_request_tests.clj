@@ -41,7 +41,7 @@
 (deftest get-host-prefixes-test-no-prefixes
   (let [resp (app (mock/request
                     :get "/channel/test"
-                    {"VER"  8
+                    {"VER"  protocol-version
                      "MODE" "init"
                      "zx"   (random-string)
                      "t"    1}))]
@@ -55,7 +55,7 @@
                        {:host-prefixes ["a", "b", "c"]})
         resp    (app (mock/request
                        :get "/channel/test"
-                       {"VER"  8
+                       {"VER"  protocol-version
                         "MODE" "init"
                         "zx"   (random-string)
                         "t"    1})
@@ -69,7 +69,7 @@
 (deftest buffering-proxy-test
   (let [resp       (app (mock/request
                           :get "/channel/test"
-                          {"VER" 8
+                          {"VER" protocol-version
                            "zx"  (random-string)
                            "t"   1}))
         async-resp @async-output]
