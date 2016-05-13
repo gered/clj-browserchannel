@@ -109,7 +109,7 @@
     (is (session-id-string? session-id))
     session-id))
 
-(deftest backchannel-request-test
+(deftest create-session-and-open-backchannel-test
   (let [options     (update-in default-options [:headers] dissoc "Content-Type")
         create-resp (app (->new-session-request) options)
         session-id  (get-session-id create-resp)
@@ -150,7 +150,7 @@
          "zx"   (random-string)
          "t"    1})))
 
-(deftest backchannel-request-send-data-to-client-test
+(deftest send-data-to-client-test
   (let [options     (update-in default-options [:headers] dissoc "Content-Type")
         create-resp (app (->new-session-request) options)
         session-id  (get-session-id create-resp)
@@ -166,7 +166,7 @@
       (is (= (-> arrays ffirst second (get "__edn") (edn/read-string))
              {:foo "bar"})))))
 
-(deftest backchannel-request-send-multiple-data-to-client-test
+(deftest send-multiple-data-to-client-test
   (let [options     (update-in default-options [:headers] dissoc "Content-Type")
         create-resp (app (->new-session-request) options)
         session-id  (get-session-id create-resp)
@@ -185,14 +185,15 @@
       (is (= (get-edn-from-arrays arrays 1)
              "hello, world")))))
 
-(deftest backchannel-request-heartbeat-test
+(deftest backchannel-heartbeat-test
   (let [options     (-> default-options
                         (update-in [:headers] dissoc "Content-Type")
-                        ; shortened heartbeat interval for the purposes of this test
                         (assoc :keep-alive-interval 2))
         create-resp (app (->new-session-request) options)
         session-id  (get-session-id create-resp)
         back-resp   (app (->new-backchannel-request session-id))]
+    (wait-for-agent-send-offs)
+    (is (:heartbeat-timeout @(get @sessions session-id)))
     (wait-for-scheduled-interval (:keep-alive-interval options))
     (let [async-resp @async-output
           arrays     (get-response-arrays (:body async-resp))]
