@@ -3,6 +3,7 @@
   (:import
     [java.util.concurrent ScheduledExecutorService Executors TimeUnit Callable ScheduledFuture])
   (:require
+    [clojure.tools.logging :as log]
     [clojure.edn :as edn]
     [cheshire.core :as json]
     [ring.middleware.params :as params]
@@ -110,10 +111,9 @@
    :body   (str "<html><body><h1>" message "</h1></body></html>")})
 
 (defn- agent-error-handler-fn
-  "Prints the error and tries to restart the agent."
   [id]
-  (fn [ag ^Exception e]
-    (println "ERROR:" id "agent threw" e (.getMessage e))))
+  (fn [ag e]
+    (log/error e (str id " agent exception."))))
 
 (defn- to-pair
   [p]
@@ -382,6 +382,7 @@
   ISession
 
   (clear-back-channel [this]
+    (log/trace id ": clear-back-channel" (if back-channel "(existing back-channel)" ""))
     (try
       (when back-channel
         (write-end (:respond back-channel)))
@@ -394,6 +395,7 @@
         refresh-session-timeout))
 
   (set-back-channel [this respond req]
+    (log/trace id ": set-back-channel")
     (let [bc (BackChannel. respond
                            ;; can we stream responses
                            ;; back?
@@ -416,12 +418,14 @@
 
   (clear-heartbeat [this]
     (when heartbeat-timeout
+      (log/trace id ": clear-heartbeat")
       (.cancel ^ScheduledFuture heartbeat-timeout
                false ;; do not interrupt running tasks
                ))
     (assoc this :heartbeat-timeout nil))
 
   (refresh-heartbeat [this]
+    (log/trace id ": refresh-heartbeat")
     (-> this
         clear-heartbeat
         (assoc :heartbeat-timeout
@@ -437,25 +441,30 @@
 
   (clear-session-timeout [this]
     (when session-timeout
+      (log/trace id ": clear-session-timeout")
       (.cancel ^ScheduledFuture session-timeout
                false ;; do not interrupt running tasks
                ))
     (assoc this :session-timeout nil))
 
   (refresh-session-timeout [this]
+    (log/trace id ": refresh-session-timeout")
     (-> this
         clear-session-timeout
         (assoc :session-timeout
                (let [session-agent *agent*]
                  (schedule
                    (fn []
+                     (log/trace id ": session timed out")
                      (send-off session-agent close nil "Timed out"))
                    (:session-timeout-interval details))))))
 
   (queue-string [this json-string]
+    (log/trace id ": queue-string" (pr-str json-string))
     (update-in this [:array-buffer] queue json-string))
 
   (acknowledge-arrays [this array-id-str]
+    (log/trace id ": acknowledge-arrays" array-id-str)
     (let [array-id (Long/parseLong array-id-str)]
       (update-in this [:array-buffer] acknowledge-id array-id)))
 
@@ -463,11 +472,13 @@
   ;; @todo the composition is a bit awkward in this method due to the
   ;; try catch and if mix
   (flush-buffer [this]
+    (log/trace id ": flush-buffer" (if-not back-channel "(no back-channel)" ""))
     (if-not back-channel
       this ;; nothing to do when there's no connection
       ;; only flush unacknowledged arrays
       (if-let [[to-flush next-array-buffer] (to-flush array-buffer)]
         (try
+          (log/trace id ": flushing" (count to-flush) "arrays")
           ;; buffer contains [[1 json-str] ...] can't use
           ;; json-str which will double escape the json
 
@@ -491,6 +502,7 @@
             ;; make a new heartbeat
             (refresh-heartbeat this))
           (catch Exception e
+            (log/trace e id ": exception during flush")
             ;; when write failed
             ;; non delivered arrays are still in buffer
             (clear-back-channel this)
@@ -500,6 +512,7 @@
 
   ;; closes the session and removes it from sessions
   (close [this request message]
+    (log/trace id ": close" (if message (str "(message: " message ")") ""))
     (-> this
         clear-back-channel
         clear-session-timeout
@@ -521,6 +534,7 @@
     ;; when a client specifies and old session id then that old one
     ;; needs to be removed
     (when-let [old-session-agent (@sessions old-session-id)]
+      (log/trace old-session-id ": old session reconnect")
       (send-off old-session-agent #(-> (if old-array-id
                                          (acknowledge-arrays % old-array-id)
                                          %)
@@ -548,6 +562,7 @@
                                   nil ;; session-timeout
                                   )
           session-agent (agent session)]
+      (log/trace id ": new session created" (if old-session-id (str "(old session id: " old-session-id ")") ""))
       (set-error-handler! session-agent (agent-error-handler-fn (str "session-" (:id session))))
       (set-error-mode! session-agent :continue)
       ;; add new session-agent to our list of active browserchannel sessions

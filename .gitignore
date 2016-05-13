@@ -15,5 +15,8 @@ pom.xml.asc
 *.iml
 *.ipr
 *.iws
+repl/
+repl-resources/
+profiles.clj
 
 /chat-demo/resources/public/cljs

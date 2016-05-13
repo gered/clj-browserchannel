@@ -6,7 +6,11 @@
 		</encoder>
 	</appender>
 
+	<!-- these are just to remove some "chatty" logging output, especially for DEBUG and lower.
+	     you don't necessarily need this yourself -->
 	<logger name="org.eclipse.jetty" level="INFO"/>
+	<logger name="org.xnio" level="INFO"/>
+	<logger name="io.undertow" level="INFO"/>
 
 	<root level="${ROOT_LEVEL:-INFO}">
 		<appender-ref ref="R"/>
