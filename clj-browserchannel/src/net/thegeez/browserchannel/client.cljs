@@ -7,7 +7,11 @@
     [goog.events :as events]
     [goog.debug.Logger.Level :as log-level]))
 
-(defonce channel (goog.net.BrowserChannel.))
+(defonce channel (atom (goog.net.BrowserChannel.)))
+
+(defonce last-error (atom nil))
+(defonce reconnect-attempts-counter (atom nil))
+(defonce reconnect-timer (atom nil))
 
 (def ^:private bch-state-enum-to-keyword
   {
@@ -61,7 +65,7 @@
 (defn channel-state
   "returns the current state of the browserchannel connection."
   []
-  (get bch-state-enum-to-keyword (.getState channel) :unknown))
+  (get bch-state-enum-to-keyword (.getState @channel) :unknown))
 
 (defn connected?
   "returns true if the browserchannel connection is currently connected."
@@ -72,7 +76,7 @@
   "sets the debug log level, and optionally a log output handler function
    which defaults to js/console.log"
   [level & [f]]
-  (doto (.. channel getChannelDebug getLogger)
+  (doto (.. @channel getChannelDebug getLogger)
     (.setLevel level)
     (.addHandler (or f #(js/console.log %)))))
 
@@ -82,7 +86,31 @@
    on-success callback is invoked."
   [data & [{:keys [on-success]}]]
   (if data
-    (.sendMap channel (encode-map data) {:on-success on-success})))
+    (.sendMap @channel (encode-map data) {:on-success on-success})))
+
+(defn- get-anti-forgery-token
+  []
+  (if-let [tag (sel1 "meta[name='anti-forgery-token']")]
+    (.-content tag)))
+
+(defn- apply-options!
+  [options]
+  (let [csrf-token (get-anti-forgery-token)
+        headers    (merge
+                     (:headers options)
+                     (if csrf-token {"X-CSRF-Token" csrf-token}))]
+    (set-debug-log! (if (:verbose-logging? options) log-level/FINER log-level/OFF))
+    (doto @channel
+      (.setExtraHeaders (clj->js headers))
+      (.setAllowChunkedMode (boolean (:allow-chunked-mode? options)))
+      (.setAllowHostPrefix (boolean (:allow-host-prefix? options)))
+      (.setFailFast (boolean (:fail-fast? options)))
+      (.setForwardChannelMaxRetries (:max-forward-channel-retries options))
+      (.setForwardChannelRequestTimeout (:forward-channel-request-timeout options)))
+    ;; HACK: this is relying on changing a value for a setting that google's
+    ;;       documentation lists as private. however, it is a fairly important
+    ;;       setting to be able to change, so i think it's worth the risk...
+    (set! goog.net.BrowserChannel/BACK_CHANNEL_MAX_RETRIES (:max-back-channel-retries options))))
 
 (defn connect!
   "starts the browserchannel connection (initiates a connection to the server).
@@ -92,33 +120,62 @@
   (let [state (channel-state)]
     (if (or (= state :closed)
             (= state :init))
-      (.connect channel
+      (.connect @channel
                 (str base "/test")
                 (str base "/bind")))))
 
-(defn disconnect!
-  "disconnects and closes the browserchannel connection."
+(defn- clear-reconnect-timer!
   []
-  (if-not (= (channel-state) :closed)
-    (.disconnect channel)))
+  (swap! reconnect-timer
+         (fn [timer]
+           (if timer (js/clearTimeout timer))
+           nil)))
 
-(defn- get-anti-forgery-token
+(defn disconnect!
+  "disconnects and closes the browserchannel connection, and stops and
+   reconnection attempts"
   []
-  (if-let [tag (sel1 "meta[name='anti-forgery-token']")]
-    (.-content tag)))
+  (reset! last-error :ok)
+  (clear-reconnect-timer!)
+  (if-not (= (channel-state) :closed)
+    (.disconnect @channel)))
+
+(defn- reconnect!
+  [handler options]
+  (reset! channel (goog.net.BrowserChannel.))
+  (swap! reconnect-attempts-counter inc)
+  (.setHandler @channel handler)
+  (apply-options! options)
+  (connect! options))
 
 (defn- ->handler
-  [{:keys [on-open on-close on-receive on-sent on-error]}]
+  [{:keys [on-open on-close on-receive on-sent on-error]} options]
   (let [handler (goog.net.BrowserChannel.Handler.)]
     (set! (.-channelOpened handler)
           (fn [ch]
+            (reset! last-error nil)
+            (reset! reconnect-attempts-counter 0)
             (if on-open
               (on-open))))
     (set! (.-channelClosed handler)
           (fn [ch pending undelivered]
-            (if on-close
-              (on-close (decode-queued-map-array pending)
-                        (decode-queued-map-array undelivered)))))
+            (let [due-to-error? (and @last-error
+                                     (not (some #{@last-error} [:stop :ok])))]
+              (when (and (:auto-reconnect? options)
+                         due-to-error?
+                         (< @reconnect-attempts-counter
+                            (dec (:max-reconnect-attempts options))))
+                (clear-reconnect-timer!)
+                (js/setTimeout
+                  #(reconnect! handler options)
+                  (if (= @last-error :unknown-session-id)
+                    0
+                    (:reconnect-time options))))
+              (if on-close
+                (on-close due-to-error?
+                          (decode-queued-map-array pending)
+                          (decode-queued-map-array undelivered)))
+              (reset! last-error nil))))
     (set! (.-channelHandleArray handler)
           (fn [ch m]
             (if on-receive
@@ -135,22 +192,11 @@
                   (on-success))))))
     (set! (.-channelError handler)
           (fn [ch error-code]
-            (if on-error
-              (on-error (get bch-error-enum-to-keyword error-code :unknown)))))
+            (let [error-code (get bch-error-enum-to-keyword error-code :unknown)]
+              (reset! last-error error-code)
+              (if on-error
+                (on-error error-code)))))
     handler))
-
-(defn- apply-options!
-  [options]
-  (set-debug-log! (if (:verbose-logging? options) log-level/FINER log-level/OFF))
-  (.setAllowChunkedMode channel (boolean (:allow-chunked-mode? options)))
-  (.setAllowHostPrefix channel (boolean (:allow-host-prefix? options)))
-  (.setFailFast channel (boolean (:fail-fast? options)))
-  (.setForwardChannelMaxRetries channel (:max-forward-channel-retries options))
-  (.setForwardChannelRequestTimeout channel (:forward-channel-request-timeout options))
-  ;; HACK: this is relying on changing a value for a setting that google's
-  ;;       documentation lists as private. however, it is a fairly important
-  ;;       setting to be able to change, so i think it's worth the risk...
-  (set! goog.net.BrowserChannel/BACK_CHANNEL_MAX_RETRIES (:max-back-channel-retries options)))
 
 (def default-options
   "default options that will be applied by init! unless
@@ -184,6 +230,18 @@
 
    ;; whether to enable somewhat verbose debug logging
    :verbose-logging?                false
+
+   ;; whether to automatically reconnect in the event the session
+   ;; connection is lost due to some error. if the server requests
+   ;; that we disconnect, an automatic reconnect will not occur
+   :auto-reconnect?                 true
+
+   ;; time after an error resulting in a disconnect before we try to
+   ;; reconnect again (milliseconds)
+   :reconnect-time                  (* 3 1000)
+
+   ; sets the max number of reconnection attempts
+   :max-reconnect-attempts          3
    })
 
 (defn init!
@@ -193,7 +251,7 @@
    handler should be a map of event handler functions:
 
    {:on-open    (fn [] ...)
-    :on-close   (fn [pending undelivered] ...)
+    :on-close   (fn [due-to-error? pending undelivered] ...)
     :on-receive (fn [data] ...)
     :on-sent    (fn [delivered] ...)
     :on-error   (fn [error-code] ...)
@@ -204,15 +262,13 @@
    :on-sent is called when data has been successfully sent to
    the server ('delivered' is a list of what was sent).
    :on-error is only invoked once just before the connection is
-   closed, and only if there was an error."
+   closed, and only if there was an error.
+
+   for other supported options, see
+   net.thegeez.browserchannel.client/default-options"
   [handler & [options]]
   (let [options (merge default-options options)]
     (events/listen js/window "unload" #(disconnect!))
-    (.setHandler channel (->handler handler))
+    (.setHandler @channel (->handler handler options))
     (apply-options! options)
-    (let [csrf-token (get-anti-forgery-token)
-          headers    (merge
-                       (:headers options)
-                       (if csrf-token {"X-CSRF-Token" csrf-token}))]
-      (.setExtraHeaders channel (clj->js headers)))
     (connect! options)))
