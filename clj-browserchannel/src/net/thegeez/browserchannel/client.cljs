@@ -7,12 +7,6 @@
     [goog.events :as events]
     [goog.debug.Logger.Level :as log-level]))
 
-(defonce channel (atom (goog.net.BrowserChannel.)))
-
-(defonce last-error (atom nil))
-(defonce reconnect-attempts-counter (atom nil))
-(defonce reconnect-timer (atom nil))
-
 (def ^:private bch-state-enum-to-keyword
   {
    0 :closed                  ; channel is closed
@@ -35,6 +29,47 @@
    11 :bad-response           ; error due to a response that doesn't start with the magic cookie
    12 :active-x-blocked       ; activex is blocked by the machine's admin settings
    })
+
+(defonce state (atom {:channel            (goog.net.BrowserChannel.)
+                      :last-error         nil
+                      :reconnect-counter  0
+                      :reconnect-timer-id nil}))
+
+(defn ^goog.net.BrowserChannel get-channel
+  "returns the BrowserChannel object representing the current session"
+  []
+  (:channel @state))
+
+(defn- get-last-error [] (:last-error @state))
+(defn- get-reconnect-counter [] (:reconnect-counter @state))
+(defn- get-reconnect-timer-id [] (:reconnect-timer-id @state))
+
+(defn- set-new-channel!
+  []
+  (swap! state assoc :channel (goog.net.BrowserChannel.)))
+
+(defn- clear-reconnect-timer!
+  []
+  (swap! state update-in [:reconnect-timer-id]
+         (fn [timer-id]
+           (if timer-id (js/clearTimeout timer-id))
+           nil)))
+
+(defn- clear-last-error!
+  []
+  (swap! state assoc :last-error :ok))
+
+(defn- set-last-error!
+  [error-code]
+  (swap! state assoc :last-error error-code))
+
+(defn- reset-reconnect-attempts-counter!
+  []
+  (swap! state assoc :reconnect-counter 0))
+
+(defn- increase-reconnect-attempt-counter!
+  []
+  (swap! state update-in [:reconnect-counter] inc))
 
 (defn- encode-map
   [data]
@@ -65,7 +100,7 @@
 (defn channel-state
   "returns the current state of the browserchannel connection."
   []
-  (get bch-state-enum-to-keyword (.getState @channel) :unknown))
+  (get bch-state-enum-to-keyword (.getState (get-channel)) :unknown))
 
 (defn connected?
   "returns true if the browserchannel connection is currently connected."
@@ -76,7 +111,7 @@
   "sets the debug log level, and optionally a log output handler function
    which defaults to js/console.log"
   [level & [f]]
-  (doto (.. @channel getChannelDebug getLogger)
+  (doto (.. (get-channel) getChannelDebug getLogger)
     (.setLevel level)
     (.addHandler (or f #(js/console.log %)))))
 
@@ -86,7 +121,7 @@
    on-success callback is invoked."
   [data & [{:keys [on-success]}]]
   (if data
-    (.sendMap @channel (encode-map data) {:on-success on-success})))
+    (.sendMap (get-channel) (encode-map data) {:on-success on-success})))
 
 (defn- get-anti-forgery-token
   []
@@ -100,7 +135,7 @@
                      (:headers options)
                      (if csrf-token {"X-CSRF-Token" csrf-token}))]
     (set-debug-log! (if (:verbose-logging? options) log-level/FINER log-level/OFF))
-    (doto @channel
+    (doto (get-channel)
       (.setExtraHeaders (clj->js headers))
       (.setAllowChunkedMode (boolean (:allow-chunked-mode? options)))
       (.setAllowHostPrefix (boolean (:allow-host-prefix? options)))
@@ -120,31 +155,25 @@
   (let [state (channel-state)]
     (if (or (= state :closed)
             (= state :init))
-      (.connect @channel
+      (.connect (get-channel)
                 (str base "/test")
                 (str base "/bind")))))
 
-(defn- clear-reconnect-timer!
-  []
-  (swap! reconnect-timer
-         (fn [timer]
-           (if timer (js/clearTimeout timer))
-           nil)))
 
 (defn disconnect!
-  "disconnects and closes the browserchannel connection, and stops and
+  "disconnects and closes the browserchannel connection, and stops any
    reconnection attempts"
   []
-  (reset! last-error :ok)
+  (clear-last-error!)
   (clear-reconnect-timer!)
   (if-not (= (channel-state) :closed)
-    (.disconnect @channel)))
+    (.disconnect (get-channel))))
 
 (defn- reconnect!
   [handler options]
-  (reset! channel (goog.net.BrowserChannel.))
-  (swap! reconnect-attempts-counter inc)
-  (.setHandler @channel handler)
+  (set-new-channel!)
+  (increase-reconnect-attempt-counter!)
+  (.setHandler (get-channel) handler)
   (apply-options! options)
   (connect! options))
 
@@ -152,36 +181,37 @@
   [{:keys [on-open on-close on-receive on-sent on-error]} options]
   (let [handler (goog.net.BrowserChannel.Handler.)]
     (set! (.-channelOpened handler)
-          (fn [ch]
-            (reset! last-error nil)
-            (reset! reconnect-attempts-counter 0)
+          (fn [_]
+            (clear-last-error!)
+            (reset-reconnect-attempts-counter!)
             (if on-open
               (on-open))))
     (set! (.-channelClosed handler)
-          (fn [ch pending undelivered]
-            (let [due-to-error? (and @last-error
-                                     (not (some #{@last-error} [:stop :ok])))]
+          (fn [_ pending undelivered]
+            (let [last-error    (:last-error @state)
+                  due-to-error? (and last-error
+                                     (not (some #{last-error} [:stop :ok])))]
               (when (and (:auto-reconnect? options)
                          due-to-error?
-                         (< @reconnect-attempts-counter
+                         (< (:reconnect-counter @state)
                             (dec (:max-reconnect-attempts options))))
                 (clear-reconnect-timer!)
                 (js/setTimeout
                   #(reconnect! handler options)
-                  (if (= @last-error :unknown-session-id)
+                  (if (= last-error :unknown-session-id)
                     0
                     (:reconnect-time options))))
               (if on-close
                 (on-close due-to-error?
                           (decode-queued-map-array pending)
                           (decode-queued-map-array undelivered)))
-              (reset! last-error nil))))
+              (clear-last-error!))))
     (set! (.-channelHandleArray handler)
-          (fn [ch m]
+          (fn [_ m]
             (if on-receive
               (on-receive (decode-map m)))))
     (set! (.-channelSuccess handler)
-          (fn [ch delivered]
+          (fn [_ delivered]
             (if on-sent
               (let [decoded (decode-queued-map-array delivered)]
                 (if (seq decoded)
@@ -191,9 +221,9 @@
                 (if on-success
                   (on-success))))))
     (set! (.-channelError handler)
-          (fn [ch error-code]
+          (fn [_ error-code]
             (let [error-code (get bch-error-enum-to-keyword error-code :unknown)]
-              (reset! last-error error-code)
+              (set-last-error! error-code)
               (if on-error
                 (on-error error-code)))))
     handler))
@@ -269,6 +299,6 @@
   [handler & [options]]
   (let [options (merge default-options options)]
     (events/listen js/window "unload" #(disconnect!))
-    (.setHandler @channel (->handler handler options))
+    (.setHandler (get-channel) (->handler handler options))
     (apply-options! options)
     (connect! options)))
