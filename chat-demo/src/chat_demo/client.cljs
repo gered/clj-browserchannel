@@ -17,29 +17,40 @@
 (def event-handlers
   {:on-open
    (fn []
-     (let [msg-input    (by-id "msg-input")
-           send-button  (by-id "send-button")
-           send-message (fn [e]
-                          (say (dom/value msg-input))
-                          (dom/set-value! msg-input ""))]
-       (toggle-element msg-input)
-       (toggle-element send-button)
-       (events/listen
-         (goog.events.KeyHandler. msg-input)
-         "key"
-         (fn [e]
-           (when (= (.-keyCode e) key-codes/ENTER)
-             (send-message e))))
-       (events/listen
-         send-button
-         "click"
-         send-message)))
+     ; enable message sending UI
+     (toggle-element (by-id "msg-input"))
+     (toggle-element (by-id "send-button")))
 
    :on-receive
    (fn [data]
+     ; show messages received from the server
      (dom/append! (by-id "room")
                   (-> (dom/create-element "div")
-                      (dom/set-text! (str "MSG::" (:msg data))))))})
+                      (dom/set-text! (str "MSG::" (:msg data))))))
+
+   :on-close
+   (fn [due-to-error? pending undelivered]
+     ; disable message sending UI
+     (toggle-element (by-id "msg-input"))
+     (toggle-element (by-id "send-button")))})
 
 (defn ^:export run []
-  (browserchannel/init! event-handlers))
+  ; wire-up UI events
+  (let [msg-input    (by-id "msg-input")
+        send-button  (by-id "send-button")
+        send-message (fn [e]
+                       (say (dom/value msg-input))
+                       (dom/set-value! msg-input ""))]
+    (events/listen
+      (goog.events.KeyHandler. msg-input)
+      "key"
+      (fn [e]
+        (when (= (.-keyCode e) key-codes/ENTER)
+          (send-message e))))
+    (events/listen
+      send-button
+      "click"
+      send-message))
+
+  ; initiate browserchannel session with the server
+  (browserchannel/connect! event-handlers))
