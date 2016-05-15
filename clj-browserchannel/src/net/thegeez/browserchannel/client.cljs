@@ -154,7 +154,9 @@
       (.setAllowHostPrefix (boolean (:allow-host-prefix? options)))
       (.setFailFast (boolean (:fail-fast? options)))
       (.setForwardChannelMaxRetries (:max-forward-channel-retries options))
-      (.setForwardChannelRequestTimeout (:forward-channel-request-timeout options)))
+      (.setForwardChannelRequestTimeout (:forward-channel-request-timeout options))
+      (.setRetryDelay (:base-connect-retry-delay options)
+                      (:connect-retry-delay-seed options)))
     ;; HACK: this is relying on changing a value for a setting that google's
     ;;       documentation lists as private. however, it is a fairly important
     ;;       setting to be able to change, so i think it's worth the risk...
@@ -266,6 +268,16 @@
 
    ;; sets the timeout (in milliseconds) for a forward channel request
    :forward-channel-request-timeout (* 20 1000)
+
+   ; base time delay for another connection attempt is made. note
+   ; that a random time between 0 and :connect-retry-delay-seed is
+   ; added to this value to determine the final reconnect delay time.
+   ; time is in milliseconds
+   :base-connect-retry-delay        (* 5 1000)
+
+   ; see description of :base-connect-retry-delay. time is in
+   ; milliseconds
+   :connect-retry-delay-seed        (* 10 1000)
 
    ;; whether to enable somewhat verbose debug logging
    :verbose-logging?                false
