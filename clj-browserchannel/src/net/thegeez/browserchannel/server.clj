@@ -708,7 +708,7 @@
         ;; maps contains whatever the messages to the server
         maps (get-maps req)]
     ;; if maps were received in this request, we should forward to listeners
-    ;; (client is allowed to send requests in the new session request as well,
+    ;; (client is allowed to send maps in the new session request as well,
     ;; so for both existing sessions and new sessions we do this)
     (if (and (seq maps)
              session-agent)
@@ -721,6 +721,9 @@
       ;; response is first array sent for this session:
       ;; [[0,["c", session-id, host-prefix, version (always equal to protocol-version)]]]
       ;; send as json for XHR and IE
+      ;; TODO: the server is allowed to flush any queued arrays and include them in the
+      ;;       response of this new-session request here (after the required first array
+      ;;       with the session-id, etc in it).
       (let [session     @session-agent
             session-id  (:id session)
             ;; @todo extract the used host-prefix from the request if any
@@ -741,17 +744,21 @@
 ;; GET req server->client is a backwardchannel opened by client
 (defn- handle-backward-channel
   [req session-agent options]
-  (let [type (get-in req [:query-params "TYPE"])]
+  (let [type (get-in req [:query-params "TYPE"])
+        rid  (get-in req [:query-params "RID"])]
     (cond
       (#{"xmlhttp" "html"} type)
-      ;; @todo check that query RID is "rpc"
-      {:async   :http
-       :reactor (fn [respond]
-                  (write-head respond)
-                  (send-off session-agent set-back-channel respond req))}
+      (if-not (= "rpc" rid)
+        (error-response 400 "Invalid RID")
+        {:async   :http
+         :reactor (fn [respond]
+                    (write-head respond)
+                    (send-off session-agent set-back-channel respond req))})
+
       (= type "terminate")
-      ;; this is a request made in an img tag
-      (do ;;end session
+      (do
+        ;; this is a request made in an img tag
+        ;;end session
         (when session-agent
           (send-off session-agent close req "Client disconnected"))
         {:status  200
