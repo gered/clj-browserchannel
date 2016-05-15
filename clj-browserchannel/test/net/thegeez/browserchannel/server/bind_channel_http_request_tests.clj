@@ -392,6 +392,53 @@
       (is (connected? session-id))
       (is (not (:closed? @async-output))))))
 
+(deftest receive-multiple-data-from-client-in-one-request-test
+  (let [received     (atom [])
+        on-receive   (fn [session-id request data]
+                       (swap! received conj {:session-id session-id
+                                             :request    request
+                                             :data       data}))
+        options      (-> default-options
+                         (assoc :events {:on-receive on-receive}))
+        create-resp  (app (->new-session-request) options)
+        session-id   (get-session-id create-resp)
+        back-resp    (app (->new-backchannel-request session-id))]
+    (wait-for-agent-send-offs)
+    (let [forward-resp (app (-> (mock/request
+                                  :post "/channel/bind")
+                                (mock/query-string
+                                  {"VER"  protocol-version
+                                   "SID"  session-id
+                                   "AID"  0
+                                   "RID"  1
+                                   "CVER" protocol-version
+                                   "zx"   (random-string)
+                                   "t"    1})
+                                (mock/body
+                                  {"count"      "2"
+                                   "ofs"        "0"
+                                   "req0___edn" (pr-str {:foo "bar"})
+                                   "req1___edn" (pr-str {:second "map"})})))
+          [len status] (string/split (:body forward-resp) #"\n" 2)
+          [backchannel-present last-bkch-array-id outstanding-bytes] (json/parse-string status)]
+      (wait-for-agent-send-offs)
+      (is (= 200 (:status forward-resp)))
+      (is (> (Long/parseLong len) 0))
+      (is (= 1 backchannel-present))
+      (is (= 0 last-bkch-array-id))
+      (is (= 0 outstanding-bytes))
+      (is (= 2 (count @received)))
+      (is (= session-id (:session-id (first @received))))
+      (is (= session-id (:session-id (second @received))))
+      (is (map? (:request (first @received))))
+      (is (map? (:request (second @received))))
+      (is (= (:data (first @received))
+             {:foo "bar"}))
+      (is (= (:data (second @received))
+             {:second "map"}))
+      (is (connected? session-id))
+      (is (not (:closed? @async-output))))))
+
 (defn ->new-forwardchannel-request
   [session-id aid data]
   (-> (mock/request
@@ -469,6 +516,36 @@
       (is (= (first @received)
              :foobar))
       (is (connected? session-id)))))
+
+(deftest receive-data-from-client-in-session-create-request-test
+  (let [received     (atom [])
+        on-receive   (fn [session-id request data]
+                       (swap! received conj {:session-id session-id
+                                             :request    request
+                                             :data       data}))
+        options      (-> default-options
+                         (assoc :events {:on-receive on-receive}))
+        create-resp  (app (-> (mock/request
+                                :post "/channel/bind")
+                              (mock/query-string
+                                {"VER"  protocol-version
+                                 "RID"  1
+                                 "CVER" protocol-version
+                                 "zx"   (random-string)
+                                 "t"    1})
+                              (mock/body
+                                {"count"      "1"
+                                 "ofs"        "0"
+                                 "req0___edn" (pr-str {:msg "hello, world"})}))
+                          options)
+        session-id   (get-session-id create-resp)]
+    (wait-for-agent-send-offs)
+    (is (connected? session-id))
+    (is (= 1 (count @received)))
+    (is (= session-id (:session-id (first @received))))
+    (is (map? (:request (first @received))))
+    (is (= (:data (first @received))
+           {:msg "hello, world"}))))
 
 (deftest forward-channel-response-has-correct-outstanding-bytes-test
   (let [received     (atom [])
