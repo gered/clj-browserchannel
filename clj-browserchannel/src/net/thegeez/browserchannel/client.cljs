@@ -30,7 +30,8 @@
    12 :active-x-blocked       ; activex is blocked by the machine's admin settings
    })
 
-(defonce state (atom {:channel            (goog.net.BrowserChannel.)
+(defonce state (atom {:channel            nil
+                      :queued-buffer      []
                       :last-error         nil
                       :reconnect-counter  0
                       :reconnect-timer-id nil}))
@@ -44,9 +45,17 @@
 (defn- get-reconnect-counter [] (:reconnect-counter @state))
 (defn- get-reconnect-timer-id [] (:reconnect-timer-id @state))
 
+(defn- flush-queued-buffer!
+  []
+  (let [queued-buffer (:queued-buffer @state)]
+    (swap! state assoc :queued-buffer [])
+    (doseq [[m context] queued-buffer]
+      (.sendMap (get-channel) m context))))
+
 (defn- set-new-channel!
   []
-  (swap! state assoc :channel (goog.net.BrowserChannel.)))
+  (swap! state assoc :channel (goog.net.BrowserChannel.))
+  (flush-queued-buffer!))
 
 (defn- clear-reconnect-timer!
   []
@@ -121,7 +130,11 @@
    on-success callback is invoked."
   [data & [{:keys [on-success]}]]
   (if data
-    (.sendMap (get-channel) (encode-map data) {:on-success on-success})))
+    (let [m       (encode-map data)
+          context {:on-success on-success}]
+      (if (get-channel)
+        (.sendMap (get-channel) m context)
+        (swap! state update-in [:queued-buffer] conj [m context])))))
 
 (defn- get-anti-forgery-token
   []
@@ -147,19 +160,6 @@
     ;;       setting to be able to change, so i think it's worth the risk...
     (set! goog.net.BrowserChannel/BACK_CHANNEL_MAX_RETRIES (:max-back-channel-retries options))))
 
-(defn connect!
-  "starts the browserchannel connection (initiates a connection to the server).
-   under normal circumstances, your application should not call this directly.
-   instead your application code should call init!"
-  [& [{:keys [base] :as options}]]
-  (let [state (channel-state)]
-    (if (or (= state :closed)
-            (= state :init))
-      (.connect (get-channel)
-                (str base "/test")
-                (str base "/bind")))))
-
-
 (defn disconnect!
   "disconnects and closes the browserchannel connection, and stops any
    reconnection attempts"
@@ -169,13 +169,22 @@
   (if-not (= (channel-state) :closed)
     (.disconnect (get-channel))))
 
+(defn- connect-channel!
+  [{:keys [base] :as options}]
+  (let [state (channel-state)]
+    (if (or (= state :closed)
+            (= state :init))
+      (.connect (get-channel)
+                (str base "/test")
+                (str base "/bind")))))
+
 (defn- reconnect!
   [handler options]
   (set-new-channel!)
   (increase-reconnect-attempt-counter!)
   (.setHandler (get-channel) handler)
   (apply-options! options)
-  (connect! options))
+  (connect-channel! options))
 
 (defn- ->handler
   [{:keys [on-open on-close on-receive on-sent on-error]} options]
@@ -274,7 +283,7 @@
    :max-reconnect-attempts          3
    })
 
-(defn init!
+(defn connect!
   "initializes a browserchannel connection for use, registers your
    application event handlers and setting any specified options.
 
@@ -298,7 +307,8 @@
    net.thegeez.browserchannel.client/default-options"
   [handler & [options]]
   (let [options (merge default-options options)]
-    (events/listen js/window "unload" #(disconnect!))
+    (events/listen js/window "unload" disconnect!)
+    (set-new-channel!)
     (.setHandler (get-channel) (->handler handler options))
     (apply-options! options)
-    (connect! options)))
+    (connect-channel! options)))
