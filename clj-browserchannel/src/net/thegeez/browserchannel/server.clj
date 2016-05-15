@@ -707,6 +707,14 @@
                                          [(create-session-agent req options) true])
         ;; maps contains whatever the messages to the server
         maps (get-maps req)]
+    ;; if maps were received in this request, we should forward to listeners
+    ;; (client is allowed to send requests in the new session request as well,
+    ;; so for both existing sessions and new sessions we do this)
+    (if (and (seq maps)
+             session-agent)
+      (doseq [m maps]
+        (let [decoded (decode-map m)]
+          (notify-listeners (:id @session-agent) req :map decoded))))
     (if is-new-session
       ;; first post after a new session is a message with the session
       ;; details.
@@ -721,19 +729,14 @@
          :headers (assoc (:headers options) "Content-Type" "application/javascript")
          :body    (size-json-str (json/generate-string [[0, ["c", session-id, host-prefix, protocol-version]]]))})
       ;; For existing sessions:
-      ;; Forward sent data by client to listeners
       ;; reply with
       ;; [backchannelPresent,lastPostResponseArrayId_,numOutstandingBackchannelBytes]
       ;; backchannelPresent = 0 for false, 1 for true
       ;; send as json for XHR and IE
-      (do
-        (doseq [m maps]
-          (let [decoded (decode-map m)]
-            (notify-listeners (:id @session-agent) req :map decoded)))
-        (let [status (session-status @session-agent)]
-          {:status  200
-           :headers (:headers options)
-           :body    (size-json-str (json/generate-string status))})))))
+      (let [status (session-status @session-agent)]
+        {:status  200
+         :headers (:headers options)
+         :body    (size-json-str (json/generate-string status))}))))
 
 ;; GET req server->client is a backwardchannel opened by client
 (defn- handle-backward-channel
