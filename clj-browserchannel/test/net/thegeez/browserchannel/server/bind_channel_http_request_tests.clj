@@ -191,6 +191,25 @@
       (is (= (get-edn-from-arrays arrays 1)
              "hello, world")))))
 
+(deftest send-data-to-client-before-backchannel-created
+  (let [options     default-options
+        create-resp (app (->new-session-request) options)
+        session-id  (get-session-id create-resp)]
+    (wait-for-agent-send-offs)
+    (send-data session-id {:foo "bar"})
+    (wait-for-agent-send-offs)
+    (let [back-resp (app (->new-backchannel-request session-id))]
+      (wait-for-agent-send-offs)
+      (let [async-resp @async-output
+            arrays     (get-response-arrays (:body async-resp))]
+        (is (= 200 (:status back-resp)))
+        (is (= 200 (:status async-resp)))
+        (is (not (:closed? async-resp)))
+        (is (contains-all-of? (:headers async-resp)
+                              (dissoc (:headers options) "Content-Type")))
+        (is (= (get-edn-from-arrays arrays 0)
+               {:foo "bar"}))))))
+
 (deftest send-data-to-client-after-backchannel-reconnect
   (let [options     default-options
         create-resp (app (->new-session-request) options)
@@ -571,3 +590,44 @@
              42))
       (is (connected? session-id)))))
 
+(deftest flush-buffer-write-failure-resends-buffer
+  (let [failed-once? (atom false)
+        fail-fn      (fn [data]
+                       (if (and (not @failed-once?)
+                                  (string? data)
+                                  (.contains data "fail"))
+                         (reset! failed-once? true)))
+        options      (-> default-options
+                         (assoc :fail-fn fail-fn))
+        create-resp  (app (->new-session-request) options)
+        session-id   (get-session-id create-resp)]
+    (wait-for-agent-send-offs)
+    (send-data session-id :first-queued)
+    (send-data session-id :second-queued)
+    (send-data session-id "fail")
+    (send-data session-id :fourth-queued)
+    ; send-data flushes the buffer after each call, so we just delay
+    ; opening a backchannel so that we can fill up the buffer with
+    ; more then one message at a time easier
+    (let [back-resp (app (->new-backchannel-request session-id) options)]
+      (wait-for-agent-send-offs)
+      (is (= 200 (:status back-resp)))
+      (let [arrays-up-till-fail (get-response-arrays (:body @async-output))]
+        (is (= 200 (:status @async-output)))
+        (is (:closed? @async-output))
+        (is (connected? session-id))
+        (is (= :first-queued (get-edn-from-arrays arrays-up-till-fail 0)))
+        (is (= :second-queued (get-edn-from-arrays arrays-up-till-fail 1)))
+        ; hacky requirement for this unit test due to the way we capture async response output
+        (reset! async-output {})
+        (let [back-resp (app (->new-backchannel-request session-id) options)]
+          (wait-for-agent-send-offs)
+          (is (= 200 (:status back-resp)))
+          (let [arrays (get-response-arrays (:body @async-output))]
+            (is (= 200 (:status @async-output)))
+            (is (not (:closed? @async-output)))
+            (is (connected? session-id))
+            (is (= :first-queued (get-edn-from-arrays arrays 0)))
+            (is (= :second-queued (get-edn-from-arrays arrays 1)))
+            (is (= "fail" (get-edn-from-arrays arrays 2)))
+            (is (= :fourth-queued (get-edn-from-arrays arrays 3)))))))))
