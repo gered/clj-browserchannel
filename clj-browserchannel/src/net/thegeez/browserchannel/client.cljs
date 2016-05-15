@@ -9,26 +9,28 @@
 
 (defonce channel (goog.net.BrowserChannel.))
 
-; see: https://google.github.io/closure-library/api/source/closure/goog/net/browserchannel.js.src.html#l470
 (def ^:private bch-state-enum-to-keyword
-  {0 :closed
-   1 :init
-   2 :opening
-   3 :opened})
+  {
+   0 :closed                  ; channel is closed
+   1 :init                    ; channel has been initialized but hasn't yet initiated a connection
+   2 :opening                 ; channel is in the process of opening a connection to the server
+   3 :opened                  ; channel is open
+   })
 
-; see: https://google.github.io/closure-library/api/source/closure/goog/net/browserchannel.js.src.html#l521
 (def ^:private bch-error-enum-to-keyword
-  {0  :ok
-   2  :request-failed
-   4  :logged-out
-   5  :no-data
-   6  :unknown-session-id
-   7  :stop
-   8  :network
-   9  :blocked
-   10 :bad-data
-   11 :bad-response
-   12 :active-x-blocked})
+  {
+   0  :ok                     ; indicates no error has occurred
+   2  :request-failed         ; error due to a request failing
+   4  :logged-out             ; error due to the user being logged out
+   5  :no-data                ; error due to server response which contains no data
+   6  :unknown-session-id     ; error due to a server response indicating an unknown session id (also happens after a session timeout)
+   7  :stop                   ; error due to a server response requesting to stop the channel (client ideally will not treat this as an error)
+   8  :network                ; general network error
+   9  :blocked                ; error due to the channel being blocked by a network administrator
+   10 :bad-data               ; error due to bad data being returned from the server
+   11 :bad-response           ; error due to a response that doesn't start with the magic cookie
+   12 :active-x-blocked       ; activex is blocked by the machine's admin settings
+   })
 
 (defn- encode-map
   [data]
