@@ -125,13 +125,15 @@
     (.addHandler (or f #(js/console.log %)))))
 
 (defn send-data
-  "sends data to the server over the forward channel. when the data has
-   been sent and the server sends an acknowledgement, the optional
-   on-success callback is invoked."
-  [data & [{:keys [on-success]}]]
+  "sends data to the server over the forward channel. context can
+   contain optional callback functions:
+
+   on-success - called when the data has been sent to the server
+   on-error   - called if there is an error sending the data to
+                the server"
+  [data & [context]]
   (if data
-    (let [m       (encode-map data)
-          context {:on-success on-success}]
+    (let [m (encode-map data)]
       (if (get-channel)
         (.sendMap (get-channel) m context)
         (swap! state update-in [:queued-buffer] conj [m context])))))
@@ -188,6 +190,13 @@
   (apply-options! options)
   (connect-channel! options))
 
+(defn- raise-context-callbacks!
+  [array callback-k]
+  (doseq [m array]
+    (let [context (aget m "context")
+          callback (get context callback-k)]
+      (if callback (callback)))))
+
 (defn- ->handler
   [{:keys [on-open on-close on-receive on-sent on-error]} options]
   (let [handler (goog.net.BrowserChannel.Handler.)]
@@ -195,8 +204,7 @@
           (fn [_]
             (clear-last-error!)
             (reset-reconnect-attempts-counter!)
-            (if on-open
-              (on-open))))
+            (if on-open (on-open))))
     (set! (.-channelClosed handler)
           (fn [_ pending undelivered]
             (let [last-error    (:last-error @state)
@@ -212,6 +220,9 @@
                   (if (= last-error :unknown-session-id)
                     0
                     (:reconnect-time options))))
+              (when due-to-error?
+                (raise-context-callbacks! pending :on-error)
+                (raise-context-callbacks! undelivered :on-error))
               (if on-close
                 (on-close due-to-error?
                           (decode-queued-map-array pending)
@@ -225,18 +236,13 @@
           (fn [_ delivered]
             (if on-sent
               (let [decoded (decode-queued-map-array delivered)]
-                (if (seq decoded)
-                  (on-sent decoded))))
-            (doseq [m delivered]
-              (let [{:keys [on-success] :as context} (aget m "context")]
-                (if on-success
-                  (on-success))))))
+                (if (seq decoded) (on-sent decoded))))
+            (raise-context-callbacks! delivered :on-success)))
     (set! (.-channelError handler)
           (fn [_ error-code]
             (let [error-code (get bch-error-enum-to-keyword error-code :unknown)]
               (set-last-error! error-code)
-              (if on-error
-                (on-error error-code)))))
+              (if on-error (on-error error-code)))))
     handler))
 
 (def default-options
