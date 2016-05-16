@@ -276,7 +276,7 @@
    ;; sets the timeout (in milliseconds) for a forward channel request
    :forward-channel-request-timeout (* 20 1000)
 
-   ; base time delay for another connection attempt is made. note
+   ; base time delay before another connection attempt is made. note
    ; that a random time between 0 and :connect-retry-delay-seed is
    ; added to this value to determine the final reconnect delay time.
    ; time is in milliseconds

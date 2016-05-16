@@ -42,33 +42,49 @@
             [4 "four"]
             [5 "five"])]
 
-    (= (drop-queue q 2)
-       (->queue
-         [3 "three"]
-         [4 "four"]
-         [5 "five"]))
+    (is (= (drop-queue q 2 nil)
+           (->queue
+             [3 "three"]
+             [4 "four"]
+             [5 "five"])))
 
-    (= (drop-queue q 0)
-       q)
+    (is (= (drop-queue q 0 nil)
+           q))
 
-    (= (drop-queue q 5)
-       (->queue))))
+    (is (= (drop-queue q 5 nil)
+           (->queue))))
+
+  (let [dropped (atom [])
+        q       (->queue
+                  [1 "one"]
+                  [2 "two"]
+                  [3 "three"]
+                  [4 "four"]
+                  [5 "five"])]
+    (is (= (drop-queue q 2 #(swap! dropped conj %))
+           (->queue
+             [3 "three"]
+             [4 "four"]
+             [5 "five"])))
+    (is (= @dropped
+           [[1 "one"]
+            [2 "two"]]))))
 
 (deftest encoded-map-tests
-  (= (encode-map "hello, world")
-     {"__edn" "\"hello, world\""})
-  (= (decode-map {"__edn" "\"hello, world\""})
-     "hello, world")
+  (is (= (encode-map "hello, world")
+         {"__edn" "\"hello, world\""}))
+  (is (= (decode-map {"__edn" "\"hello, world\""})
+         "hello, world"))
 
-  (= (encode-map {:foo "bar"})
-     {"__edn" "{:foo \"bar\"}"})
-  (= (decode-map {"__edn" "{:foo \"bar\"}"})
-     {:foo "bar"})
+  (is (= (encode-map {:foo "bar"})
+         {"__edn" "{:foo \"bar\"}"}))
+  (is (= (decode-map {"__edn" "{:foo \"bar\"}"})
+         {:foo "bar"}))
 
-  (= (encode-map nil)
-     {"__edn" "nil"})
-  (= (decode-map {"__edn" "nil"})
-     nil)
+  (is (= (encode-map nil)
+         {"__edn" "nil"}))
+  (is (= (decode-map {"__edn" "nil"})
+         nil))
 
-  (= (decode-map {:foo "bar"})
-     {:foo "bar"}))
+  (is (= (decode-map {:foo "bar"})
+         {:foo "bar"})))

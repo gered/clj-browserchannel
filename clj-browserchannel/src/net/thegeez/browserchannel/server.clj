@@ -57,13 +57,15 @@
 
 ;; type preserving drop upto for queueus
 (defn drop-queue
-  [queue id]
+  [queue id on-drop]
   (let [head (peek queue)]
     (if-not head
       queue
       (if (< id (first head))
         queue
-        (recur (pop queue) id)))))
+        (do
+          (if on-drop (on-drop head))
+          (recur (pop queue) id on-drop))))))
 
         
 ;; Key value pairs do not always come ordered by request number.
@@ -117,9 +119,9 @@
   (fn [ag e]
     (log/error e (str id " agent exception."))))
 
-(defn- to-pair
-  [p]
-  (str "[" (first p) "," (second p) "]"))
+(defn- array-item-to-json-pair
+  [item]
+  (str "[" (first item) "," (first (second item)) "]"))
 
 (defn decode-map
   [m]
@@ -231,10 +233,10 @@
     (async-adapter/close respond)))
 
 ;;ArrayBuffer
-;;buffer of [[id_lowest data] ... [id_highest data]]
+;;buffer of [[id_lowest [data context]] ... [id_highest [data context]]]
 (defprotocol IArrayBuffer
-  (queue [this string])
-  (acknowledge-id [this id])
+  (queue [this string context])
+  (acknowledge-id [this id on-ack-fn])
   (to-flush [this])
   (last-acknowledged-id [this])
   (outstanding-bytes [this]))
@@ -255,15 +257,17 @@
    ;; arrays to be sent out, may contain arrays
    ;; that were in to-acknowledge-arrays but queued
    ;; again for resending
+   ;; format of each array item is [id [data context]]
+   ;; where data is the actual string and context is a map or nil
    to-flush-arrays]
   IArrayBuffer
 
-  (queue [this string]
+  (queue [this string context]
     (let [next-array-id (inc array-id)]
       (ArrayBuffer. next-array-id
                     last-acknowledged-id
                     to-acknowledge-arrays
-                    (conj to-flush-arrays [next-array-id string]))))
+                    (conj to-flush-arrays [next-array-id [string context]]))))
 
   ;; id may cause the following splits:
   ;; normal case:
@@ -274,21 +278,23 @@
   ;; ack-arrs flush-arrs <id> flush-arrs
   ;; everything before id can be discarded, everything after id
   ;; becomes new flush-arrs and is resend
-  (acknowledge-id [this id]
+  (acknowledge-id [this id on-ack-fn]
     (ArrayBuffer. array-id
                   id
                   clojure.lang.PersistentQueue/EMPTY
-                  (into (drop-queue to-acknowledge-arrays id)
-                        (drop-queue to-flush-arrays id))))
+                  (into (drop-queue to-acknowledge-arrays id on-ack-fn)
+                        (drop-queue to-flush-arrays id on-ack-fn))))
 
   ;; return [seq-to-flush-array next-array-buffer] or nil if
   ;; to-flush-arrays is empty
+  ;; format of each array item is [id [data context]]
+  ;; where data is the actual string and context is a map or nil
   (to-flush [this]
     (when-let [to-flush (seq to-flush-arrays)]
       [to-flush (ArrayBuffer. array-id
                               last-acknowledged-id
                               (into to-acknowledge-arrays
-                                    (remove (fn [[id string]]
+                                    (remove (fn [[id [string context]]]
                                               (= string noop-string))
                                             to-flush))
                               clojure.lang.PersistentQueue/EMPTY)]))
@@ -296,9 +302,9 @@
   (last-acknowledged-id [this]
     last-acknowledged-id)
 
-  ;; the sum of all the data that is still to be send
+  ;; the sum of all the data that is still to be sent
   (outstanding-bytes [this]
-    (reduce + 0 (map (comp count second) to-flush-arrays))))
+    (reduce + 0 (map (comp count first second) to-flush-arrays))))
 
 
 
@@ -322,7 +328,8 @@
   ;; the client acknowledges received arrays when creating a new backwardchannel
   (acknowledge-arrays [this array-id-str])
 
-  (queue-string [this json-string])
+  ;; context is either a map or nil
+  (queue-string [this json-string context])
 
   ;; heartbeat is a timer to send noop over the backward channel
   (clear-heartbeat [this])
@@ -437,7 +444,7 @@
                  (schedule
                    (fn []
                      (send-off session-agent #(-> %
-                                                  (queue-string noop-string)
+                                                  (queue-string noop-string nil)
                                                   flush-buffer)))
                    (:heartbeat-interval details))))))
 
@@ -461,14 +468,16 @@
                      (send-off session-agent close nil "Timed out"))
                    (:session-timeout-interval details))))))
 
-  (queue-string [this json-string]
-    (log/trace id ": queue-string" (pr-str json-string))
-    (update-in this [:array-buffer] queue json-string))
+  (queue-string [this json-string context]
+    (log/trace id ": queue-string" (pr-str json-string) (if context "(has context)" ""))
+    (update-in this [:array-buffer] queue json-string context))
 
   (acknowledge-arrays [this array-id-str]
     (log/trace id ": acknowledge-arrays" array-id-str)
     (let [array-id (Long/parseLong array-id-str)]
-      (update-in this [:array-buffer] acknowledge-id array-id)))
+      (update-in this [:array-buffer] acknowledge-id array-id
+                 (fn [[id [string {:keys [on-confirm]}]]]
+                   (if on-confirm (on-confirm))))))
 
   ;; tries to do the actual writing to the client
   ;; @todo the composition is a bit awkward in this method due to the
@@ -481,14 +490,16 @@
       (if-let [[to-flush next-array-buffer] (to-flush array-buffer)]
         (try
           (log/trace id ": flushing" (count to-flush) "arrays")
-          ;; buffer contains [[1 json-str] ...] can't use
-          ;; json-str which will double escape the json
+          ;; buffer contains [[1 [json-str context]] ...]
+          ;; can't use json-str which will double escape the json
 
-          (doseq [p to-flush]
-            (write (:respond back-channel) (str "[" (to-pair p) "]")))
+          (doseq [item to-flush]
+            (let [{:keys [on-sent] :as context} (second (second item))]
+              (write (:respond back-channel) (str "[" (array-item-to-json-pair item) "]"))
+              (if on-sent (on-sent))))
 
           ;; size is an approximation
-          (let [this (let [size (reduce + 0 (map count (map second to-flush)))]
+          (let [this (let [size (reduce + 0 (map count (map (comp first second) to-flush)))]
                        (-> this
                            (assoc :array-buffer next-array-buffer)
                            (update-in [:back-channel :bytes-sent] + size)))
@@ -507,6 +518,8 @@
             (log/trace e id ": exception during flush")
             ;; when write failed
             ;; non delivered arrays are still in buffer
+            ;; (note that we don't raise any on-error callbacks for any items in the buffer
+            ;; as we will retry sending the items next time since they're still in the buffer)
             (clear-back-channel this)
             ))
         this ;; do nothing if buffer is empty
@@ -521,9 +534,24 @@
         ;; the heartbeat timeout is cancelled by clear-back-channel
         )
     (swap! sessions dissoc id)
+    ; raise callbacks for any remaining unsent messages
+    (let [[remaining _] (to-flush array-buffer)]
+      (doseq [[id [string {:keys [on-error] :as context}]] remaining]
+        (if on-error (on-error))))
+    ; finally raise the session close event
     (notify-listeners id request :close message)
     nil ;; the agent will no longer wrap a session
     ))
+
+(defn- handle-old-session-reconnect
+  [req old-session-id old-session-agent old-array-id]
+  (log/trace old-session-id ": old session reconnect")
+  (send-off old-session-agent
+            (fn [this]
+              (-> (if old-array-id
+                    (acknowledge-arrays this old-array-id)
+                    this)
+                  (close req "Reconnected")))))
 
 ;; creates a session agent wrapping session data and
 ;; adds the session to sessions
@@ -535,12 +563,8 @@
          old-array-id   "OAID"} (:query-params req)]
     ;; when a client specifies and old session id then that old one
     ;; needs to be removed
-    (when-let [old-session-agent (@sessions old-session-id)]
-      (log/trace old-session-id ": old session reconnect")
-      (send-off old-session-agent #(-> (if old-array-id
-                                         (acknowledge-arrays % old-array-id)
-                                         %)
-                                       (close req "Reconnected"))))
+    (if-let [old-session-agent (@sessions old-session-id)]
+      (handle-old-session-reconnect req old-session-id old-session-agent old-array-id))
     (let [id            (uuid)
           details       {:address                  (:remote-addr req)
                          :headers                  (:headers req)
@@ -551,18 +575,17 @@
           session       (Session. id
                                   details
                                   nil ;; backchannel
-                                  (ArrayBuffer.
-                                    0 ;; array-id, 0 is never used by the
-                                    ;; array-buffer, it is used by the
-                                    ;; first message with the session id
-                                    0 ;; last-acknowledged-id
-                                    ;; to-acknowledge-arrays
-                                    clojure.lang.PersistentQueue/EMPTY
-                                    ;; to-flush-arrays
-                                    clojure.lang.PersistentQueue/EMPTY)
-                                  nil ;; heartbeat-timeout
-                                  nil ;; session-timeout
-                                  )
+                                  (ArrayBuffer. 0 ;; array-id, 0 is never used by the
+                                                  ;; array-buffer, it is used by the
+                                                  ;; first message with the session id.
+                                                0 ;; last-acknowledged-id
+                                                ;; to-acknowledge-arrays
+                                                clojure.lang.PersistentQueue/EMPTY
+                                                ;; to-flush-arrays
+                                                clojure.lang.PersistentQueue/EMPTY)
+                                                nil ;; heartbeat-timeout
+                                                nil ;; session-timeout
+                                                )
           session-agent (agent session)]
       (log/trace id ": new session created" (if old-session-id (str "(old session id: " old-session-id ")") ""))
       (set-error-handler! session-agent (agent-error-handler-fn (str "session-" (:id session))))
@@ -594,27 +617,38 @@
 ;; the data will be queued until there is a backchannel to send it
 ;; over
 (defn- send-map
-  [session-id m]
+  [session-id m context]
   (when-let [session-agent (get @sessions session-id)]
     (let [string (json/generate-string m)]
-      (send-off session-agent #(-> %
-                                   (queue-string string)
-                                   flush-buffer))
+      (send-off session-agent
+                #(-> %
+                     (queue-string string context)
+                     flush-buffer))
       string)))
 
 (defn send-data
   "sends data to the client identified by session-id over the backchannel.
    if there is currently no available backchannel for this client, the data
-   is queued until one is available."
-  [session-id data]
+   is queued until one is available. context can contain optional callback
+   functions:
+
+   on-sent    - when the data has been written to an active backchannel
+   on-confirm - when the client confirms it has received the data. note that
+                it may take awhile (minutes) for the client to send an
+                acknowledgement
+   on-error   - when there was an error (of any kind) sending the data"
+  [session-id data & [context]]
   (if data
-    (send-map session-id (encode-map data))))
+    (send-map session-id (encode-map data) context)))
 
 (defn send-data-to-all
-  "sends data to all currently connected clients over their backchannels."
-  [data]
+  "sends data to all currently connected clients over their backchannels.
+   context can contain optional callback functions which will be used for
+   all the data sent. see send-data for a description of the different
+   callback functions available."
+  [data & [context]]
   (doseq [[session-id _] @sessions]
-    (send-data session-id data)))
+    (send-data session-id data context)))
 
 (defn connected?
   "returns true if a client with the given session-id is currently connected."
