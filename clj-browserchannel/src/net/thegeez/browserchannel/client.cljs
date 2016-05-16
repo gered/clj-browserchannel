@@ -174,21 +174,22 @@
     (.disconnect (get-channel))))
 
 (defn- connect-channel!
-  [{:keys [base] :as options}]
+  [{:keys [on-opening] :as events} {:keys [base] :as options}]
   (let [state (channel-state)]
-    (if (or (= state :closed)
-            (= state :init))
+    (when (or (= state :closed)
+              (= state :init))
       (.connect (get-channel)
                 (str base "/test")
-                (str base "/bind")))))
+                (str base "/bind"))
+      (if on-opening (on-opening)))))
 
 (defn- reconnect!
-  [handler options]
+  [events handler options]
   (set-new-channel!)
   (increase-reconnect-attempt-counter!)
   (.setHandler (get-channel) handler)
   (apply-options! options)
-  (connect-channel! options))
+  (connect-channel! events options))
 
 (defn- raise-context-callbacks!
   [array callback-k]
@@ -197,8 +198,8 @@
           callback (get context callback-k)]
       (if callback (callback)))))
 
-(defn- ->handler
-  [{:keys [on-open on-close on-receive on-sent on-error]} options]
+(defn- ->browserchannel-handler
+  [{:keys [on-open on-close on-receive on-sent on-error] :as events} options]
   (let [handler (goog.net.BrowserChannel.Handler.)]
     (set! (.-channelOpened handler)
           (fn [_]
@@ -216,7 +217,7 @@
                             (dec (:max-reconnect-attempts options))))
                 (clear-reconnect-timer!)
                 (js/setTimeout
-                  #(reconnect! handler options)
+                  #(reconnect! events handler options)
                   (if (= last-error :unknown-session-id)
                     0
                     (:reconnect-time options))))
@@ -246,7 +247,7 @@
     handler))
 
 (def default-options
-  "default options that will be applied by init! unless
+  "default options that will be applied by connect! unless
    overridden."
   {
    ;; base/root url on which to send browserchannel requests to
@@ -305,28 +306,22 @@
   "initializes a browserchannel connection for use, registers your
    application event handlers and setting any specified options.
 
-   handler should be a map of event handler functions:
+   events should be a map of event handler functions. you only need
+   to include handler functions for events you care about.
 
-   {:on-open    (fn [] ...)
+   {:on-opening (fn [] ...)
+    :on-open    (fn [] ...)
     :on-close   (fn [due-to-error? pending undelivered] ...)
     :on-receive (fn [data] ...)
     :on-sent    (fn [delivered] ...)
     :on-error   (fn [error-code] ...)
 
-   :on-open is called when a connection is (re-)established.
-   :on-close is called when a connection is closed.
-   :on-receive is called when data is received from the server.
-   :on-sent is called when data has been successfully sent to
-   the server ('delivered' is a list of what was sent).
-   :on-error is only invoked once just before the connection is
-   closed, and only if there was an error.
-
-   for other supported options, see
+   for the supported options, see
    net.thegeez.browserchannel.client/default-options"
-  [handler & [options]]
+  [events & [options]]
   (let [options (merge default-options options)]
     (events/listen js/window "unload" disconnect!)
     (set-new-channel!)
-    (.setHandler (get-channel) (->handler handler options))
+    (.setHandler (get-channel) (->browserchannel-handler events options))
     (apply-options! options)
-    (connect-channel! options)))
+    (connect-channel! events options)))
