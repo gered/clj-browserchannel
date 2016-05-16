@@ -5,15 +5,15 @@
 
   :dependencies  [[org.clojure/clojure "1.8.0"]
                   [org.clojure/clojurescript "1.8.51"]
+                  [ring "1.4.0"]
+                  [org.immutant/web "2.1.4"]
                   [ring/ring-defaults "0.2.0" :exclusions [javax.servlet/servlet-api]]
-                  [ring/ring-devel "1.4.0"]
                   [compojure "1.4.0"]
                   [clj-pebble "0.2.0"]
                   [prismatic/dommy "1.1.0"]
                   [gered/clj-browserchannel "0.3"]
                   [gered/clj-browserchannel-jetty-adapter "0.1.0"]
                   [gered/clj-browserchannel-immutant-adapter "0.0.2"]
-                  [org.immutant/web "2.1.4"]
                   [environ "1.0.3"]]
 
   :plugins       [[lein-cljsbuild "1.1.3"]

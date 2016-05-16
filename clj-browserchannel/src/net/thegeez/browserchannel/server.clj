@@ -865,8 +865,8 @@
    :base                     "/channel"
 
    ;; interval at which keepalive responses are sent to help ensure
-   ;; that clients don't close connections early. specified in
-   ;; seconds. keep less then session-timeout-interval
+   ;; that clients don't close backchannel connections early.
+   ;; specified in seconds. keep less then session-timeout-interval
    :keep-alive-interval      30
 
    ;; seconds to wait without any client activity before the
