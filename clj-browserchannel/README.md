@@ -4,6 +4,9 @@ Cross-browser compatible, real-time, bi-directional
 communication between ClojureScript and Clojure using Google Closure
 BrowserChannel.
 
+This is the main library that provides the client/server functionality
+that your projects will make use of.
+
 See also: [clj-browserchannel][1]
 
 [1]: https://github.com/gered/clj-browserchannel
