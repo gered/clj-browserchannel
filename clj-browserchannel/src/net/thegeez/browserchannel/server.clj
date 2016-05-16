@@ -150,12 +150,12 @@
 (set-error-mode! listeners-agent :continue)
 
 
-(defn add-listener
+(defn add-listener!
   [session-id event-key f]
   (send-off listeners-agent
             update-in [session-id event-key] #(conj (or % []) f)))
 
-(defn notify-listeners
+(defn notify-listeners!
   [session-id request event-key & data]
   (send-off listeners-agent
             (fn [listeners]
@@ -539,11 +539,11 @@
       (doseq [[id [string {:keys [on-error] :as context}]] remaining]
         (if on-error (on-error))))
     ; finally raise the session close event
-    (notify-listeners id request :close message)
+    (notify-listeners! id request :close message)
     nil ;; the agent will no longer wrap a session
     ))
 
-(defn- handle-old-session-reconnect
+(defn- handle-old-session-reconnect!
   [req old-session-id old-session-agent old-array-id]
   (log/trace old-session-id ": old session reconnect")
   (send-off old-session-agent
@@ -555,7 +555,7 @@
 
 ;; creates a session agent wrapping session data and
 ;; adds the session to sessions
-(defn- create-session-agent
+(defn- create-session-agent!
   [req events options]
   (let [{initial-rid    "RID"  ;; identifier for forward channel
          app-version    "CVER" ;; client can specify a custom app-version
@@ -564,7 +564,7 @@
     ;; when a client specifies and old session id then that old one
     ;; needs to be removed
     (if-let [old-session-agent (@sessions old-session-id)]
-      (handle-old-session-reconnect req old-session-id old-session-agent old-array-id))
+      (handle-old-session-reconnect! req old-session-id old-session-agent old-array-id))
     (let [id            (uuid)
           details       {:address                  (:remote-addr req)
                          :headers                  (:headers req)
@@ -597,8 +597,8 @@
       (send-off session-agent refresh-session-timeout)
       ;; register application-level browserchannel session events
       (let [{:keys [on-open on-close on-receive]} events]
-        (if on-close (add-listener id :close on-close))
-        (if on-receive (add-listener id :map on-receive))
+        (if on-close (add-listener! id :close on-close))
+        (if on-receive (add-listener! id :map on-receive))
         (if on-open (on-open id req)))
       session-agent)))
 
@@ -613,20 +613,19 @@
 
 
 
-;; convience function to send data to a session
-;; the data will be queued until there is a backchannel to send it
-;; over
-(defn- send-map
-  [session-id m context]
+;; convience function to send arbitrary clojure data structures to a session
+;; the data will be queued until there is a backchannel to send it over
+(defn- send-raw-data!
+  [session-id data context]
   (when-let [session-agent (get @sessions session-id)]
-    (let [string (json/generate-string m)]
+    (let [string (json/generate-string data)]
       (send-off session-agent
                 #(-> %
                      (queue-string string context)
                      flush-buffer))
       string)))
 
-(defn send-data
+(defn send-data!
   "sends data to the client identified by session-id over the backchannel.
    if there is currently no available backchannel for this client, the data
    is queued until one is available. context can contain optional callback
@@ -639,16 +638,16 @@
    on-error   - when there was an error (of any kind) sending the data"
   [session-id data & [context]]
   (if data
-    (send-map session-id (encode-map data) context)))
+    (send-raw-data! session-id (encode-map data) context)))
 
-(defn send-data-to-all
+(defn send-data-to-all!
   "sends data to all currently connected clients over their backchannels.
    context can contain optional callback functions which will be used for
    all the data sent. see send-data for a description of the different
    callback functions available."
   [data & [context]]
   (doseq [[session-id _] @sessions]
-    (send-data session-id data context)))
+    (send-data! session-id data context)))
 
 (defn connected?
   "returns true if a client with the given session-id is currently connected."
@@ -656,7 +655,8 @@
   (contains? @sessions session-id))
 
 (defn disconnect!
-  "forcefully closes/disconnects the client session identified by session-id.
+  "forcefully and instantly closes/disconnects the client session
+   identified by session-id.
    NOTE: the client code in net.thegeez.browserchannel.client will treat
          this as an error and may try to reconnect. if you do not wish this
          to happen, use close! instead."
@@ -672,7 +672,7 @@
          it is possible the session won't be closed right away if e.g. the
          client does not currently have an active backchannel."
   [session-id & [reason]]
-  (send-map session-id ["stop"] {:on-sent #(disconnect! session-id reason)}))
+  (send-raw-data! session-id ["stop"] {:on-sent #(disconnect! session-id reason)}))
 
 (defn get-status
   "returns connection status info about the client identified by session-id"
@@ -751,7 +751,7 @@
   [req session-agent events options]
   (let [[session-agent is-new-session] (if session-agent
                                          [session-agent false]
-                                         [(create-session-agent req events options) true])
+                                         [(create-session-agent! req events options) true])
         ;; maps contains whatever the messages to the server
         maps (get-maps req)]
     ;; if maps were received in this request, we should forward to listeners
@@ -761,7 +761,7 @@
              session-agent)
       (doseq [m maps]
         (let [decoded (decode-map m)]
-          (notify-listeners (:id @session-agent) req :map decoded))))
+          (notify-listeners! (:id @session-agent) req :map decoded))))
     (if is-new-session
       ;; first post after a new session is a message with the session
       ;; details.

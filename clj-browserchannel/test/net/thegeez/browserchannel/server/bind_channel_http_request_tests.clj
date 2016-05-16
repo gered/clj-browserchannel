@@ -163,7 +163,7 @@
         back-resp   (app (->new-backchannel-request session-id))]
     (wait-for-agent-send-offs)
     ; 3. send data to client along backchannel
-    (send-data session-id {:foo "bar"})
+    (send-data! session-id {:foo "bar"})
     (wait-for-agent-send-offs)
     ; 4. get async response so far from the backchannel
     (let [async-resp @async-output
@@ -186,8 +186,8 @@
         back-resp   (app (->new-backchannel-request session-id))]
     (wait-for-agent-send-offs)
     ; 3. send data to client along backchannel
-    (send-data session-id {:foo "bar"})
-    (send-data session-id "hello, world")
+    (send-data! session-id {:foo "bar"})
+    (send-data! session-id "hello, world")
     (wait-for-agent-send-offs)
     ; 4. get async response so far from the backchannel
     (let [async-resp @async-output
@@ -210,7 +210,7 @@
         session-id  (get-session-id create-resp)]
     (wait-for-agent-send-offs)
     ; 2. send data to client. no backchannel yet, so it should be queued in a buffer
-    (send-data session-id {:foo "bar"})
+    (send-data! session-id {:foo "bar"})
     (wait-for-agent-send-offs)
     ; 3. backchannel request (long request, async response).
     ;    queued buffer of messages is flushed to backchannel when it first opens
@@ -254,7 +254,7 @@
     (let [back-resp (app (->new-backchannel-request session-id))]
       (wait-for-agent-send-offs)
       ; 6. send data to client along backchannel
-      (send-data session-id {:foo "bar"})
+      (send-data! session-id {:foo "bar"})
       (wait-for-agent-send-offs)
       ; 7. get async response so far from the backchannel
       (let [async-resp @async-output
@@ -670,7 +670,7 @@
         queued-str   (pr-str (encode-map str-to-send))]
     (wait-for-agent-send-offs)
     ; 2. send data to client. no backchannel is active, so data will be queued in the buffer
-    (send-data session-id str-to-send)
+    (send-data! session-id str-to-send)
     (wait-for-agent-send-offs)
     ; 3. forwardchannel request to send data from client to server
     (let [forward-resp  (app (->new-forwardchannel-request session-id 0 42) :events events)
@@ -706,10 +706,10 @@
     ; 3. queue up a bunch of data to be sent. no backchannel has been created yet,
     ;    so this will all sit in the buffer and get flushed once the backchannel
     ;    is opened
-    (send-data session-id :first-queued)
-    (send-data session-id :second-queued)
-    (send-data session-id "fail")
-    (send-data session-id :fourth-queued)
+    (send-data! session-id :first-queued)
+    (send-data! session-id :second-queued)
+    (send-data! session-id "fail")
+    (send-data! session-id :fourth-queued)
     ; 4. backchannel request (long request, async response)
     (let [back-resp (app (->new-backchannel-request session-id) :options options)]
       (wait-for-agent-send-offs)

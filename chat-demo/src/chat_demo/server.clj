@@ -16,17 +16,17 @@
   {:on-open
    (fn [session-id request]
      (println "client" session-id "connected")
-     (browserchannel/send-data-to-all {:msg (str "client " session-id " connected")}))
+     (browserchannel/send-data-to-all! {:msg (str "client " session-id " connected")}))
 
    :on-close
    (fn [session-id request reason]
      (println "client" session-id "disconnected. reason: " reason)
-     (browserchannel/send-data-to-all {:msg (str "client " session-id " disconnected. reason: " reason)}))
+     (browserchannel/send-data-to-all! {:msg (str "client " session-id " disconnected. reason: " reason)}))
 
    :on-receive
    (fn [session-id request m]
      (println "client" session-id "sent" m)
-     (browserchannel/send-data-to-all m))})
+     (browserchannel/send-data-to-all! m))})
 
 (def app-routes
   (routes

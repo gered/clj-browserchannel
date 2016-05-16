@@ -124,7 +124,7 @@
     (.setLevel level)
     (.addHandler (or f #(js/console.log %)))))
 
-(defn send-data
+(defn send-data!
   "sends data to the server over the forward channel. context can
    contain optional callback functions:
 

@@ -9,7 +9,7 @@
 (enable-console-print!)
 
 (defn say [text]
-  (browserchannel/send-data {:msg text}))
+  (browserchannel/send-data! {:msg text}))
 
 (defn toggle-element [elem]
   (dom/toggle-attr! elem :disabled (not (dom/attr elem :disabled))))
