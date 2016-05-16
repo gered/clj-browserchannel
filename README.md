@@ -13,112 +13,52 @@ The javascript api of BrowserChannel is open-source and part of the
 Google Closure library. The server component is not, as is noted in
 the Google Closure book ("Closure: The Definitive Guide by Michael Bolin").
 
-[1]: http://closure-library.googlecode.com/svn-history/r144/docs/closure_goog_net_browserchannel.js.html
+[1]: https://google.github.io/closure-library/api/source/closure/goog/net/browserchannel.js.src.html
+
+## Usage
+
+[clj-browserchannel][2] is the main library containing both the server- and
+client-side functionality you'll use in your web apps.
+
+In order to use the server implementation of BrowserChannel you'll need to
+use an async adapter. Currently the provided options are:
+
+* [clj-browserchannel-jetty-adapter][3]
+* [clj-browserchannel-immutant-adapter][4]
+
+[2]: https://github.com/gered/clj-browserchannel/tree/master/clj-browserchannel
+[3]: https://github.com/gered/clj-browserchannel/tree/master/clj-browserchannel-jetty-adapter
+[4]: https://github.com/gered/clj-browserchannel/tree/master/clj-browserchannel-immutant-adapter
+
+You can find more information on usage of all of these components by
+following any of the above links to them.
 
 ## Demo
 
-clj-browserchannel-demo is an example chat application using a server
-side implementation for BrowserChannel written in Clojure. The server
-component is for BrowserChannel version 8.
+The [chat-demo][2] application is an example chat application using a
+client-side and server-side implementation for BrowserChannel written in
+Clojure/ClojureScript. The server component is for BrowserChannel version 8.
+The client component serves as a wrapper over `goog.net.BrowserChannel`.
 
-This enables client->server and server->client communication in
-ClojureScript and Closure web apps, without any javascript
-dependencies other than the Google Closure [library][2].
+[2]: https://github.com/gered/clj-browserchannel/tree/master/chat-demo
 
-[2]: https://developers.google.com/closure/library/
-
-The example runs in at least:
+The chat-demo web app runs in at least:
 
 * Chrome
 * Firefox
 * Internet Explorer 5.5+ (!!)
 * Android browser
 
-## Jetty Async
-
-When there are long lasting connections between a client and a
-webserver it is desirable to not have a thread per
-connection. Therefore this demo runs with with an asynchronous Jetty
-adapter. This adapter is compatible with Ring.
-
-The adapter is based on [ring-jetty-async-adapter][3] by Mark McGranaghan.
-
-[3]: https://github.com/mmcgrana/ring/tree/jetty-async
-
-An implementation on top of Netty, through [Aleph][4] is in
-development.
-
-[4]: https://github.com/ztellman/aleph
-
 ## Related and alternative frameworks
 
 * Websockets - Websockets solve the same problems as BrowserChannel,
   however BrowserChannel works on almost all existing clients.
-* socket.io - [socket.io][5] provides a similar api as BrowserChannel on
-top of many transport protocols, including websockets. BrowserChannel
-only has two transport protocols: XHR and forever frames (for IE) in
-streaming and non-streaming mode.
+* socket.io - [socket.io][3] provides a similar api as BrowserChannel on
+  top of many transport protocols, including websockets. BrowserChannel
+  only has two transport protocols: XHR and forever frames (for IE) in
+  streaming and non-streaming mode.
 
-[5]: http://socket.io
-
-## Run 
-    ;; compile cljs
-    lein run -m tasks.build-dev-js
-    ;; compile cljs in advanced mode
-    lein run -m tasks.build-advanced-js
-    lein run -m chat-demo.core
-
-Open two windows at [http://localhost:8080/index.html](http://localhost:8080/index.html) (Advanced compiled)
-or [http://localhost:8080/index-dev.html](http://localhost:8080/index-dev.html) and start chatting!
-
-## Run on Heroku
-Use the Heroku Clojure [buildpack][7]. 
-
-    heroku config:add BUILDPACK_URL=https://github.com/heroku/heroku-buildpack-clojure.git
-
-This project additionally
-requires two build tasks to compile the ClojureScript during deployment.
-
-Enable [user_env_compile][6]: 
-
-    heroku labs:enable user_env_compile -a <YOUR_APP_NAME>
-
-Add this config var:  
-
-    heroku config:add LEIN_BUILD_TASK="run -m tasks.build-dev-js, run -m tasks.build-advanced-js"
-
-[6]: https://devcenter.heroku.com/articles/labs-user-env-compile
-[7]: https://github.com/heroku/heroku-buildpack-clojure.git
-
-### Note on disconnections on Heroku
-I have found that Heroku does not immediately report when a connection to a client
-is broken. If the client is able to reconnect this is not a problem,
-as this is supported by the BrowserChannel API. However when you
-unplug the internet cable the client cannot reconnect and the server
-must timeout the session. Ussually this happens when trying to send the next
-heartbeat to the client. On Heruko this does not report an error, even
-though there is no connection to the client. So instead of the
-connection timeing out on a heartbeat (after seconds/a minute) the
-connection will only timeout after the connection is timed out by the
-server (4 minutes by default). The Netty implementation has the same
-problem on Heroku. Deployments on Amazon Web Services do not have this
-problem. 
-
-## Configuration:
-See default-options in src/net/thegeez/browserchannel.clj
-And the :response-timeout option in src/net/thegeez/jetty_async_adapter.clj
-
-### Debug / Play around
-BrowserChannel has a helpful debug window. Uncomment the debug-window
-and .setChannelDebug lines in cljs/bc/core.cljs to enable the logging window.
-
-## Todo
-- Release backend as library
-- Handling acknowledgements by client and callbacks on queued arrays
-- Host prefixes
-- Heroku disconnection
-- Replace session listeners, possibly with lamina
-- Explore other event based Java webservers, such as Netty and Webbit
+[3]: http://socket.io
 
 ## Other BrowserChannel implementations
 Many thanks to these authors, their work is the only open-source
@@ -131,18 +71,22 @@ in C++ by Andy Hochhaus - Has the most extensive [documentation][libevent-doc] o
 in Node.js/Javascript by Joseph Gentle
 
 [libevent]: http://code.google.com/p/libevent-browserchannel-server
-[libevent-doc]: http://code.google.com/p/libevent-browserchannel-server/wiki/BrowserChannelProtocol
+[libevent-doc]: http://web.archive.org/web/20121226064550/http://code.google.com/p/libevent-browserchannel-server/wiki/BrowserChannelProtocol
 [ruby]: https://github.com/dturnbull/browserchannel
 [node]: https://github.com/josephg/node-browserchannel
 
 ## About
 
 Written by:
-Gijs Stuurman / [@thegeez][twt] / [Blog][blog] / [GitHub][github]
+Gijs Stuurman /
+[@thegeez](http://twitter.com/thegeez) /
+[Blog](http://thegeez.github.com) /
+[GitHub](https://github.com/thegeez)
 
-[twt]: http://twitter.com/thegeez
-[blog]: http://thegeez.github.com
-[github]: https://github.com/thegeez
+Many updates in this fork by:
+Gered King /
+[@geredking](http://twitter.com/geredking) /
+[GitHub](https://github.com/gered)
 
 ### License
 
