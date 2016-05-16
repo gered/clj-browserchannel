@@ -174,22 +174,30 @@
     (.disconnect (get-channel))))
 
 (defn- connect-channel!
-  [{:keys [on-opening] :as events} {:keys [base] :as options}]
+  [{:keys [on-opening] :as events}
+   {:keys [base] :as options}
+   {:keys [old-session-id last-array-id] :as connect-args}]
   (let [state (channel-state)]
     (when (or (= state :closed)
               (= state :init))
       (.connect (get-channel)
                 (str base "/test")
-                (str base "/bind"))
+                (str base "/bind")
+                nil
+                old-session-id
+                ; -1 is the default value set by goog.net.BrowserChannel
+                ; not really sure that passing in -1 is a good idea though
+                ; (that is, i don't think -1 ever gets passed in the AID param)
+                (if-not (= -1 last-array-id) last-array-id))
       (if on-opening (on-opening)))))
 
 (defn- reconnect!
-  [events handler options]
+  [events handler options connect-args]
   (set-new-channel!)
   (increase-reconnect-attempt-counter!)
   (.setHandler (get-channel) handler)
   (apply-options! options)
-  (connect-channel! events options))
+  (connect-channel! events options connect-args))
 
 (defn- raise-context-callbacks!
   [array callback-k]
@@ -208,19 +216,21 @@
             (if on-open (on-open))))
     (set! (.-channelClosed handler)
           (fn [_ pending undelivered]
-            (let [last-error    (:last-error @state)
-                  due-to-error? (and last-error
-                                     (not (some #{last-error} [:stop :ok])))]
+            (let [last-error       (:last-error @state)
+                  due-to-error?    (and last-error
+                                        (not (some #{last-error} [:stop :ok])))
+                  session-timeout? (= last-error :unknown-session-id)]
               (when (and (:auto-reconnect? options)
                          due-to-error?
                          (< (:reconnect-counter @state)
                             (dec (:max-reconnect-attempts options))))
                 (clear-reconnect-timer!)
                 (js/setTimeout
-                  #(reconnect! events handler options)
-                  (if (= last-error :unknown-session-id)
-                    0
-                    (:reconnect-time options))))
+                  #(reconnect! events handler options
+                               (if-not session-timeout?
+                                 {:old-session-id (.getSessionId (get-channel))
+                                  :last-array-id  (.getLastArrayId (get-channel))}))
+                  (if session-timeout? 0 (:reconnect-time options))))
               (when due-to-error?
                 (raise-context-callbacks! pending :on-error)
                 (raise-context-callbacks! undelivered :on-error))
@@ -324,4 +334,4 @@
     (set-new-channel!)
     (.setHandler (get-channel) (->browserchannel-handler events options))
     (apply-options! options)
-    (connect-channel! events options)))
+    (connect-channel! events options nil)))
