@@ -12,13 +12,13 @@
 (use-fixtures :each async-output-fixture)
 
 (defn app
-  [request & [options]]
+  [request & {:keys [events options]}]
   ((-> (fn [{:keys [uri] :as request}]
          (if (or (= "" uri)
                  (= "/" uri))
            (response/response "Hello, world!")
            (response/not-found "not found")))
-       (wrap-browserchannel (or options default-options))
+       (wrap-browserchannel events (or options default-options))
        (wrap-test-async-adapter (or options default-options)))
     request))
 
@@ -59,7 +59,7 @@
                         "MODE" "init"
                         "zx"   (random-string)
                         "t"    1})
-                     options)
+                     :options options)
         body    (json/parse-string (:body resp))]
     (is (= 200 (:status resp)))
     (is (contains-all-of? (:headers resp) (:headers default-options)))

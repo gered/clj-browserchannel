@@ -25,31 +25,30 @@
 (use-fixtures :each reset-sessions-fixture async-output-fixture)
 
 (defn app
-  [request & [options]]
+  [request & {:keys [events options]}]
   ((-> (fn [{:keys [uri] :as request}]
          (if (or (= "" uri)
                  (= "/" uri))
            (response/response "Hello, world!")
            (response/not-found "not found")))
-       (wrap-browserchannel (or options default-options))
+       (wrap-browserchannel events (or options default-options))
        (wrap-test-async-adapter (or options default-options)))
     request))
 
 (deftest create-session-test
-  (let [options default-options
-        resp    (app (-> (mock/request
+  (let [resp    (app (-> (mock/request
                            :post "/channel/bind")
                          (mock/query-string
                            {"VER"  protocol-version
                             "RID"  1
                             "CVER" protocol-version
                             "zx"   (random-string)
-                            "t"    1}))
-                     options)]
+                            "t"    1})))]
     (wait-for-agent-send-offs)
     (is (= 200 (:status resp)))
-    (is (contains-all-of? (:headers resp)
-                          (dissoc (:headers options) "Content-Type")))
+    (is (contains-all-of?
+          (:headers resp)
+          (dissoc (:headers default-options) "Content-Type")))
     (let [arrays (get-response-arrays (:body resp))
           [[id [c session-id host-prefix version]]] (first arrays)]
       (is (= "c" c))
@@ -111,9 +110,8 @@
     session-id))
 
 (deftest create-session-and-open-backchannel-test
-  (let [options     default-options
-        ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+  (let [; 1. forwardchannel request to create session
+        create-resp (app (->new-session-request))
         session-id  (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
         back-resp   (app (-> (mock/request
@@ -136,8 +134,9 @@
       (is (= 200 (:status async-resp)))
       ; 4. verify session is still connected, backchannel request still alive
       (is (not (:closed? async-resp)))
-      (is (contains-all-of? (:headers async-resp)
-                            (dissoc (:headers options) "Content-Type")))
+      (is (contains-all-of?
+            (:headers async-resp)
+            (dissoc (:headers default-options) "Content-Type")))
       (is (connected? session-id))
       (is (:has-back-channel? status)))))
 
@@ -157,9 +156,8 @@
          "t"    1})))
 
 (deftest send-data-to-client-test
-  (let [options     default-options
-        ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+  (let [; 1. forwardchannel request to create session
+        create-resp (app (->new-session-request))
         session-id  (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
         back-resp   (app (->new-backchannel-request session-id))]
@@ -173,16 +171,16 @@
       (is (= 200 (:status back-resp)))
       (is (= 200 (:status async-resp)))
       (is (not (:closed? async-resp)))
-      (is (contains-all-of? (:headers async-resp)
-                            (dissoc (:headers options) "Content-Type")))
+      (is (contains-all-of?
+            (:headers async-resp)
+            (dissoc (:headers default-options) "Content-Type")))
       ; 5. verify data was sent
       (is (= (-> arrays ffirst second (get "__edn") (edn/read-string))
              {:foo "bar"})))))
 
 (deftest send-multiple-data-to-client-test
-  (let [options     default-options
-        ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+  (let [; 1. forwardchannel request to create session
+        create-resp (app (->new-session-request))
         session-id  (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
         back-resp   (app (->new-backchannel-request session-id))]
@@ -197,8 +195,9 @@
       (is (= 200 (:status back-resp)))
       (is (= 200 (:status async-resp)))
       (is (not (:closed? async-resp)))
-      (is (contains-all-of? (:headers async-resp)
-                            (dissoc (:headers options) "Content-Type")))
+      (is (contains-all-of?
+            (:headers async-resp)
+            (dissoc (:headers default-options) "Content-Type")))
       ; 5. verify data was sent
       (is (= (get-edn-from-arrays arrays 0)
              {:foo "bar"}))
@@ -206,9 +205,8 @@
              "hello, world")))))
 
 (deftest send-data-to-client-before-backchannel-created
-  (let [options     default-options
-        ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+  (let [; 1. forwardchannel request to create session
+        create-resp (app (->new-session-request))
         session-id  (get-session-id create-resp)]
     (wait-for-agent-send-offs)
     ; 2. send data to client. no backchannel yet, so it should be queued in a buffer
@@ -224,16 +222,16 @@
         (is (= 200 (:status back-resp)))
         (is (= 200 (:status async-resp)))
         (is (not (:closed? async-resp)))
-        (is (contains-all-of? (:headers async-resp)
-                              (dissoc (:headers options) "Content-Type")))
+        (is (contains-all-of?
+              (:headers async-resp)
+              (dissoc (:headers default-options) "Content-Type")))
         ; 5. verify data was sent
         (is (= (get-edn-from-arrays arrays 0)
                {:foo "bar"}))))))
 
 (deftest send-data-to-client-after-backchannel-reconnect
-  (let [options     default-options
-        ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+  (let [; 1. forwardchannel request to create session
+        create-resp (app (->new-session-request))
         session-id  (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
         back-resp   (app (->new-backchannel-request session-id))]
@@ -272,10 +270,10 @@
   (let [options     (-> default-options
                         (assoc :keep-alive-interval 2))
         ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+        create-resp (app (->new-session-request) :options options)
         session-id  (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
-        back-resp   (app (->new-backchannel-request session-id))]
+        back-resp   (app (->new-backchannel-request session-id) :options options)]
     (wait-for-agent-send-offs)
     (is (:heartbeat-timeout @(get @sessions session-id)))
     ; 3. wait for heartbeat/keepalive interval to elapse
@@ -286,8 +284,9 @@
       (is (= 200 (:status back-resp)))
       (is (= 200 (:status async-resp)))
       (is (not (:closed? async-resp)))
-      (is (contains-all-of? (:headers async-resp)
-                            (dissoc (:headers options) "Content-Type")))
+      (is (contains-all-of?
+            (:headers async-resp)
+            (dissoc (:headers options) "Content-Type")))
       ; 5. verify data was sent ("noop" is the standard keepalive message that is sent)
       (is (= (get-raw-from-arrays arrays 0)
              ["noop"])))))
@@ -296,7 +295,7 @@
   (let [options     (-> default-options
                         (assoc :keep-alive-interval 2))
         ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+        create-resp (app (->new-session-request) :options options)
         session-id  (get-session-id create-resp)]
     (wait-for-agent-send-offs)
     (is (connected? session-id))
@@ -311,10 +310,10 @@
   (let [options     (-> default-options
                         (assoc :keep-alive-interval 2))
         ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+        create-resp (app (->new-session-request) :options options)
         session-id  (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
-        back-resp   (app (->new-backchannel-request session-id))]
+        back-resp   (app (->new-backchannel-request session-id) :options options)]
     (wait-for-agent-send-offs)
     (is (:heartbeat-timeout @(get @sessions session-id)))
     ; 3. close backchannel. we do it via clear-back-channel directly as it better
@@ -331,7 +330,7 @@
     ; reset async response output. hacky necessity due to the way we capture this output
     (reset! async-output {})
     ; 5. second backchannel request
-    (let [back-resp (app (->new-backchannel-request session-id))]
+    (let [back-resp (app (->new-backchannel-request session-id) :options options)]
       (wait-for-agent-send-offs)
       (is (:heartbeat-timeout @(get @sessions session-id)))
       ; 6. wait for heartbeat/keepalive interval to elapse
@@ -350,7 +349,7 @@
   (let [options     (-> default-options
                         (assoc :session-timeout-interval 3))
         ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+        create-resp (app (->new-session-request) :options options)
         session-id  (get-session-id create-resp)]
     (wait-for-agent-send-offs)
     (is (connected? session-id))
@@ -364,10 +363,10 @@
   (let [options     (-> default-options
                         (assoc :session-timeout-interval 3))
         ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+        create-resp (app (->new-session-request) :options options)
         session-id  (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
-        back-resp   (app (->new-backchannel-request session-id))]
+        back-resp   (app (->new-backchannel-request session-id) :options options)]
     (wait-for-agent-send-offs)
     (is (connected? session-id))
     (is (not (:session-timeout @(get @sessions session-id))))
@@ -379,9 +378,8 @@
     (is (not (:session-timeout @(get @sessions session-id))))))
 
 (deftest session-timeout-is-reactivated-after-backchannel-close-test
-  (let [options     default-options
-        ; 1. forwardchannel request to create session
-        create-resp (app (->new-session-request) options)
+  (let [; 1. forwardchannel request to create session
+        create-resp (app (->new-session-request))
         session-id  (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
         back-resp   (app (->new-backchannel-request session-id))]
@@ -406,14 +404,13 @@
                        (swap! event-output assoc :on-close {:session-id session-id
                                                             :request    request
                                                             :reason     reason}))
-        options      (-> default-options
-                         (assoc :events {:on-open  on-open
-                                         :on-close on-close}))
+        events       {:on-open  on-open
+                      :on-close on-close}
         ; 1. forwardchannel request to create session
-        create-resp  (app (->new-session-request) options)
+        create-resp  (app (->new-session-request) :events events)
         session-id   (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
-        back-resp    (app (->new-backchannel-request session-id))]
+        back-resp    (app (->new-backchannel-request session-id) :events events)]
     (wait-for-agent-send-offs)
     ; 3. verify that on-open event was fired and was passed correct arguments
     ;    (see on-open function defined above)
@@ -441,13 +438,12 @@
                        (swap! received conj {:session-id session-id
                                              :request    request
                                              :data       data}))
-        options      (-> default-options
-                         (assoc :events {:on-receive on-receive}))
+        events       {:on-receive on-receive}
         ; 1. forwardchannel request to create session
-        create-resp  (app (->new-session-request) options)
+        create-resp  (app (->new-session-request) :events events)
         session-id   (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
-        back-resp    (app (->new-backchannel-request session-id))]
+        back-resp    (app (->new-backchannel-request session-id) :events events)]
     (wait-for-agent-send-offs)
     ; 3. forwardchannel request so simulate sending data from client to server
     (let [forward-resp (app (-> (mock/request
@@ -463,7 +459,8 @@
                                 (mock/body
                                   {"count"      "1"
                                    "ofs"        "0"
-                                   "req0___edn" (pr-str {:foo "bar"})})))
+                                   "req0___edn" (pr-str {:foo "bar"})}))
+                            :events events)
           ; 4. parse response body
           [len status] (string/split (:body forward-resp) #"\n" 2)
           [backchannel-present last-bkch-array-id outstanding-bytes] (json/parse-string status)]
@@ -491,13 +488,12 @@
                        (swap! received conj {:session-id session-id
                                              :request    request
                                              :data       data}))
-        options      (-> default-options
-                         (assoc :events {:on-receive on-receive}))
+        events       {:on-receive on-receive}
         ; 1. forwardchannel request to create session
-        create-resp  (app (->new-session-request) options)
+        create-resp  (app (->new-session-request) :events events)
         session-id   (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
-        back-resp    (app (->new-backchannel-request session-id))]
+        back-resp    (app (->new-backchannel-request session-id) :events events)]
     (wait-for-agent-send-offs)
     ; 3. forwardchannel request so simulate sending data from client to server
     ;    (2 maps included)
@@ -515,7 +511,8 @@
                                   {"count"      "2"
                                    "ofs"        "0"
                                    "req0___edn" (pr-str {:foo "bar"})
-                                   "req1___edn" (pr-str {:second "map"})})))
+                                   "req1___edn" (pr-str {:second "map"})}))
+                            :events events)
           ; 4. parse response body
           [len status] (string/split (:body forward-resp) #"\n" 2)
           [backchannel-present last-bkch-array-id outstanding-bytes] (json/parse-string status)]
@@ -577,20 +574,19 @@
   (let [received     (atom [])
         on-receive   (fn [session-id request data]
                        (swap! received conj data))
-        options      (-> default-options
-                         (assoc :events {:on-receive on-receive}))
+        events       {:on-receive on-receive}
         ; 1. forwardchannel request to create session
-        create-resp  (app (->new-session-request) options)
+        create-resp  (app (->new-session-request) :events events)
         session-id   (get-session-id create-resp)
         ; 2. backchannel request (long request, async response)
-        back-resp    (app (->new-backchannel-request session-id))]
+        back-resp    (app (->new-backchannel-request session-id) :events events)]
     (wait-for-agent-send-offs)
     ; 3. forwardchannel request to send data from client to server
-    (let [forward-resp  (app (->new-forwardchannel-request session-id 0 "hello 1"))
+    (let [forward-resp  (app (->new-forwardchannel-request session-id 0 "hello 1") :events events)
           result1       (parse-forward-response forward-resp)]
       (wait-for-agent-send-offs)
       ; 4. a second forwardchannel request to send more data from client to server
-      (let [forward2-resp (app (->new-forwardchannel-request session-id 0 "hello 2"))
+      (let [forward2-resp (app (->new-forwardchannel-request session-id 0 "hello 2") :events events)
             result2       (parse-forward-response forward2-resp)]
         (wait-for-agent-send-offs)
         (is (= 0 (:last-bkch-array-id result1)))
@@ -609,14 +605,13 @@
   (let [received     (atom [])
         on-receive   (fn [session-id request data]
                        (swap! received conj data))
-        options      (-> default-options
-                         (assoc :events {:on-receive on-receive}))
+        events       {:on-receive on-receive}
         ; 1. forwardchannel request to create session
-        create-resp  (app (->new-session-request) options)
+        create-resp  (app (->new-session-request) :events events)
         session-id   (get-session-id create-resp)]
     (wait-for-agent-send-offs)
     ; 2. forwardchannel request to send data from client to server
-    (let [forward-resp  (app (->new-forwardchannel-request session-id 0 :foobar))
+    (let [forward-resp  (app (->new-forwardchannel-request session-id 0 :foobar) :events events)
           result        (parse-forward-response forward-resp)]
       (wait-for-agent-send-offs)
       (is (= 0 (:backchannel-present result)))
@@ -635,8 +630,7 @@
                        (swap! received conj {:session-id session-id
                                              :request    request
                                              :data       data}))
-        options      (-> default-options
-                         (assoc :events {:on-receive on-receive}))
+        events       {:on-receive on-receive}
         ; 1. forwardchannel request to create session. encode a map to be sent as part
         ;    of this request (encoded in same format as any other forwardchannel request
         ;    would do to send client->server data)
@@ -652,7 +646,7 @@
                                 {"count"      "1"
                                  "ofs"        "0"
                                  "req0___edn" (pr-str {:msg "hello, world"})}))
-                          options)
+                          :events events)
         session-id   (get-session-id create-resp)]
     (wait-for-agent-send-offs)
     (is (connected? session-id))
@@ -668,10 +662,9 @@
   (let [received     (atom [])
         on-receive   (fn [session-id request data]
                        (swap! received conj data))
-        options      (-> default-options
-                         (assoc :events {:on-receive on-receive}))
+        events       {:on-receive on-receive}
         ; 1. forwardchannel request to create session
-        create-resp  (app (->new-session-request) options)
+        create-resp  (app (->new-session-request) :events events)
         session-id   (get-session-id create-resp)
         str-to-send  "this will get queued but not sent because no backchannel is open"
         queued-str   (pr-str (encode-map str-to-send))]
@@ -680,7 +673,7 @@
     (send-data session-id str-to-send)
     (wait-for-agent-send-offs)
     ; 3. forwardchannel request to send data from client to server
-    (let [forward-resp  (app (->new-forwardchannel-request session-id 0 42))
+    (let [forward-resp  (app (->new-forwardchannel-request session-id 0 42) :events events)
           result        (parse-forward-response forward-resp)]
       (wait-for-agent-send-offs)
       ; 4. verify that the response to the forwardchannel request contained correct backchannel
@@ -707,7 +700,7 @@
         options      (-> default-options
                          (assoc :fail-fn fail-fn))
         ; 2. forwardchannel request to create session
-        create-resp  (app (->new-session-request) options)
+        create-resp  (app (->new-session-request) :options options)
         session-id   (get-session-id create-resp)]
     (wait-for-agent-send-offs)
     ; 3. queue up a bunch of data to be sent. no backchannel has been created yet,
@@ -718,7 +711,7 @@
     (send-data session-id "fail")
     (send-data session-id :fourth-queued)
     ; 4. backchannel request (long request, async response)
-    (let [back-resp (app (->new-backchannel-request session-id) options)]
+    (let [back-resp (app (->new-backchannel-request session-id) :options options)]
       (wait-for-agent-send-offs)
       ; 5. an exception should have been thrown during the flush-buffer call, but
       ;    we should have sent out some of the data before then
@@ -735,7 +728,7 @@
         (reset! async-output {})
         ; 7. re-open backchannel. all 4 items should still be in the buffer and will
         ;    get flushed again at this point
-        (let [back-resp (app (->new-backchannel-request session-id) options)]
+        (let [back-resp (app (->new-backchannel-request session-id) :options options)]
           (wait-for-agent-send-offs)
           ; 8. at this point, all 4 items should have been sent and the backchannel request
           ;    should still be active

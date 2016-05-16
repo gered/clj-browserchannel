@@ -39,7 +39,7 @@
 
 (def handler
   (-> app-routes
-      (browserchannel/wrap-browserchannel {:events event-handlers})
+      (browserchannel/wrap-browserchannel event-handlers)
       (wrap-defaults site-defaults)))
 
 (defn run-jetty []

@@ -528,7 +528,7 @@
 ;; creates a session agent wrapping session data and
 ;; adds the session to sessions
 (defn- create-session-agent
-  [req options]
+  [req events options]
   (let [{initial-rid    "RID"  ;; identifier for forward channel
          app-version    "CVER" ;; client can specify a custom app-version
          old-session-id "OSID"
@@ -573,7 +573,7 @@
       ;; when the client never connects with a backchannel
       (send-off session-agent refresh-session-timeout)
       ;; register application-level browserchannel session events
-      (let [{:keys [on-open on-close on-receive]} (:events options)]
+      (let [{:keys [on-open on-close on-receive]} events]
         (if on-close (add-listener id :close on-close))
         (if on-receive (add-listener id :map on-receive))
         (if on-open (on-open id req)))
@@ -701,10 +701,10 @@
 ;; POST req client -> server is a forward channel
 ;; session might be nil, when this is the first POST by client
 (defn- handle-forward-channel
-  [req session-agent options]
+  [req session-agent events options]
   (let [[session-agent is-new-session] (if session-agent
                                          [session-agent false]
-                                         [(create-session-agent req options) true])
+                                         [(create-session-agent req events options) true])
         ;; maps contains whatever the messages to the server
         maps (get-maps req)]
     ;; if maps were received in this request, we should forward to listeners
@@ -743,7 +743,7 @@
 
 ;; GET req server->client is a backwardchannel opened by client
 (defn- handle-backward-channel
-  [req session-agent options]
+  [req session-agent events options]
   (let [type (get-in req [:query-params "TYPE"])
         rid  (get-in req [:query-params "RID"])]
     (cond
@@ -769,7 +769,7 @@
 ;; get to /<base>/bind is client->server msg
 ;; post to /<base>/bind is initiate server->client channel
 (defn- handle-bind-channel
-  [req options]
+  [req events options]
   (let [SID           (get-in req [:query-params "SID"])
         ;; session-agent might be nil, then it will be created by
         ;; handle-forward-channel.
@@ -790,8 +790,8 @@
           (when-let [AID (get-in req [:query-params "AID"])]
             (send-off session-agent acknowledge-arrays AID)))
         (condp = (:request-method req)
-          :post (handle-forward-channel req session-agent options)
-          :get (handle-backward-channel req session-agent options))))))
+          :post (handle-forward-channel req session-agent events options)
+          :get (handle-backward-channel req session-agent events options))))))
 
 ;; straight from google
 (def standard-headers
@@ -836,26 +836,21 @@
 (defn wrap-browserchannel
   "adds browserchannel support to a ring handler.
 
-   the most important option that all applications will want to provide
-   is :events. this should be a map of event handler functions:
+   events should be a map of event handler functions. you only need to
+   include handler functions for events you care about.
 
    {:on-open    (fn [session-id request] ...)
     :on-close   (fn [session-id request reason] ...)
     :on-receive (fn [session-id request data] ...)}
-
-   :on-open is called when new client browserchannel sessions are created.
-   :on-close is called when clients disconnect.
-   :on-receive is called when data is received from the client via the
-   forward channel.
 
    for all events, request is a Ring request map and can be used to access
    up to date cookie or (http) session data, or other client info. you
    cannot use these event handlers to update the client's (http) session
    data as no response is returned via these event handler functions.
 
-   for other supported options, see
+   for the supported options, see
    net.thegeez.browserchannel.server/default-options"
-  [handler & [options]]
+  [handler events & [options]]
   (let [options (merge default-options options)
         base    (str (:base options))]
     (-> (fn [req]
@@ -867,7 +862,7 @@
               (handle-test-channel req options)
 
               (.startsWith uri (str base "/bind"))
-              (handle-bind-channel req options)
+              (handle-bind-channel req events options)
 
               :else
               (handler req))))
