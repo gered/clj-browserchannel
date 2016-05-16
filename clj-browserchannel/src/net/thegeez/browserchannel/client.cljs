@@ -109,7 +109,9 @@
 (defn channel-state
   "returns the current state of the browserchannel connection."
   []
-  (get bch-state-enum-to-keyword (.getState (get-channel)) :unknown))
+  (if-let [channel (get-channel)]
+    (get bch-state-enum-to-keyword (.getState channel) :unknown)
+    :closed))
 
 (defn connected?
   "returns true if the browserchannel connection is currently connected."
