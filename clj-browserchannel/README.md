@@ -207,7 +207,7 @@ See [here][6] for a description of the various options you can
 use. Most applications probably won't need to change any of 
 these.
 
-[6]: https://github.com/gered/clj-browserchannel/blob/master/clj-browserchannel/src/net/thegeez/browserchannel/server.clj#L838
+[6]: https://github.com/gered/clj-browserchannel/blob/master/clj-browserchannel/src/net/thegeez/browserchannel/server.clj#L851
 
 ##### Sending Data
 
@@ -374,7 +374,7 @@ used instead. See [here][8] for a description of the available
 options and their defaults.
 
 [7]: https://github.com/gered/clj-browserchannel/blob/master/clj-browserchannel/src/net/thegeez/browserchannel/client.cljs#L18
-[8]: https://github.com/gered/clj-browserchannel/blob/master/clj-browserchannel/src/net/thegeez/browserchannel/client.cljs#L249
+[8]: https://github.com/gered/clj-browserchannel/blob/master/clj-browserchannel/src/net/thegeez/browserchannel/client.cljs#L261
 
 ##### Sending Data
 

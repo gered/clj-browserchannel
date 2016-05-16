@@ -1,30 +1,23 @@
 # chat-demo for clj-browserchannel
 
-Cross-browser compatible, real-time, bi-directional
-communication between ClojureScript and Clojure using Google Closure
-BrowserChannel.
+A demo app for [clj-browserchannel][1].
 
-See also: [clj-browserchannel][1]
-[1]:https://github.com/thegeez/clj-browserchannel
+[1]:https://github.com/gered/clj-browserchannel
 
-## Demo
+The chat-demo application is a very basic web chat application making use
+of the client-side and server-side implementation for BrowserChannel provided
+by clj-browserchannel. The server component is for BrowserChannel version 8.
+The client component serves as a wrapper over `goog.net.BrowserChannel`
+which also currently implements version 8 of the protocol.
 
-clj-browserchannel-demo is an example chat application using a server
-side implementation for BrowserChannel written in Clojure. The server
-component is for BrowserChannel version 8.
-
-This enables client->server and server->client communication in
-ClojureScript and Closure web apps, without any javascript
-dependencies other than the Google Closure [library][2].
-
-[2]: https://developers.google.com/closure/library/
-
-The example runs in at least:
+The chat-demo web app runs in at least:
 
 * Chrome
 * Firefox
 * Internet Explorer 5.5+ (!!)
 * Android browser
+* Others
+
 
 ## Running
 
@@ -45,20 +38,19 @@ At the bottom of the `-main` function in `chat-demo.server`, you can
 comment/uncomment out the different `run-` functions to choose which 
 web server you want to test out the demo with.
 
+
 ## About
 
 Written by:
-Gijs Stuurman / [@thegeez][twt] / [Blog][blog] / [GitHub][github]
+Gijs Stuurman /
+[@thegeez](http://twitter.com/thegeez) /
+[Blog](http://thegeez.github.com) /
+[GitHub](https://github.com/thegeez)
 
-[twt]: http://twitter.com/thegeez
-[blog]: http://thegeez.github.com
-[github]: https://github.com/thegeez
-
-Updated by:
-Gered King / [@geredking][twt] / [Github][github]
-
-[twt]: http://twitter.com/geredking
-[github]: https://github.com/gered
+Many updates in this fork by:
+Gered King /
+[@geredking](http://twitter.com/geredking) /
+[GitHub](https://github.com/gered)
 
 ### License
 
