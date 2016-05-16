@@ -656,10 +656,23 @@
   (contains? @sessions session-id))
 
 (defn disconnect!
-  "disconnects the client identified by session-id."
+  "forcefully closes/disconnects the client session identified by session-id.
+   NOTE: the client code in net.thegeez.browserchannel.client will treat
+         this as an error and may try to reconnect. if you do not wish this
+         to happen, use close! instead."
   [session-id & [reason]]
   (if-let [session-agent (get @sessions session-id)]
     (send-off session-agent close nil (or reason "Client disconnected by server"))))
+
+(defn close!
+  "sends a message to the client requesting that it not attempt a
+   reconnection and when the message has been sent over the backchannel,
+   closes/disconnects the session.
+   NOTE: because we wait for a message to be sent before closing the session,
+         it is possible the session won't be closed right away if e.g. the
+         client does not currently have an active backchannel."
+  [session-id & [reason]]
+  (send-map session-id ["stop"] {:on-sent #(disconnect! session-id reason)}))
 
 (defn get-status
   "returns connection status info about the client identified by session-id"
