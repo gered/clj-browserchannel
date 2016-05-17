@@ -151,18 +151,22 @@
 (set-error-mode! listeners-agent :continue)
 
 
-(defn add-listener!
+(defn- add-listener!
   [session-id event-key f]
   (send-off listeners-agent
             update-in [session-id event-key] #(conj (or % []) f)))
 
-(defn notify-listeners!
+(defn- notify-listeners!
   [session-id request event-key & data]
   (send-off listeners-agent
             (fn [listeners]
               (doseq [callback (get-in listeners [session-id event-key])]
                 (apply callback session-id request data))
               listeners)))
+
+(defn- remove-listeners!
+  [session-id]
+  (send-off listeners-agent dissoc session-id))
 ;; end of listeners
 
 
@@ -541,6 +545,7 @@
         (if on-error (on-error))))
     ; finally raise the session close event
     (notify-listeners! id request :close message)
+    (remove-listeners! id)
     nil ;; the agent will no longer wrap a session
     ))
 
