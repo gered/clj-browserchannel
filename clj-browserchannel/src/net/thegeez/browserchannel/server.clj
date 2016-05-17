@@ -7,7 +7,8 @@
     [clojure.edn :as edn]
     [cheshire.core :as json]
     [ring.middleware.params :as params]
-    [net.thegeez.browserchannel.async-adapter :as async-adapter]))
+    [net.thegeez.browserchannel.async-adapter :as async-adapter]
+    [net.thegeez.browserchannel.utils :refer [get-middleware-handler-map run-middleware]]))
 
 ;; @todo: out of order acks and maps - AKH the maps at least is taken care of.
 ;; @todo use a more specific Exception for failing writes, which
@@ -596,10 +597,30 @@
       ;; when the client never connects with a backchannel
       (send-off session-agent refresh-session-timeout)
       ;; register application-level browserchannel session events
-      (let [{:keys [on-open on-close on-receive]} events]
-        (if on-close (add-listener! id :close on-close))
-        (if on-receive (add-listener! id :map on-receive))
-        (if on-open (on-open id req)))
+      (let [{:keys [on-open on-close on-receive]} events
+            middleware (get-middleware-handler-map (:middleware options) [:on-open :on-close :on-receive])]
+        (add-listener!
+          id :close
+          (fn [session-id request reason]
+            (run-middleware
+              (:on-close middleware)
+              (fn [session-id request reason]
+                (if on-close (on-close session-id request reason)))
+              session-id request reason)))
+        (add-listener!
+          id :map
+          (fn [session-id request data]
+            (run-middleware
+              (:on-receive middleware)
+              (fn [session-id request data]
+                (if on-receive (on-receive session-id request data)))
+              session-id request data)))
+        ; on-open is just triggered right now, no listener necessary
+        (run-middleware
+          (:on-open middleware)
+          (fn [session-id request]
+            (if on-open (on-open session-id request)))
+          id req))
       session-agent)))
 
 (defn- session-status
