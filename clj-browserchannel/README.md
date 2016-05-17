@@ -14,7 +14,7 @@ See also: [clj-browserchannel][1]
 
 ## Leiningen
 
-    [gered/clj-browserchannel "0.3"]
+    [gered/clj-browserchannel "0.3.1"]
 
 You will also need to include one of the async adapters as an
 additional dependency. See [here][1] for more information..

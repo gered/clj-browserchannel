@@ -9,7 +9,7 @@ See also: [clj-browserchannel][1]
 
 ## Leiningen
 
-    [gered/clj-browserchannel-immutant-adapter "0.0.2"]
+    [gered/clj-browserchannel-immutant-adapter "0.0.3"]
 
 
 ## Usage
