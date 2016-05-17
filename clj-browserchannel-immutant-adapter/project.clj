@@ -1,4 +1,4 @@
-(defproject gered/clj-browserchannel-immutant-adapter "0.0.2"
+(defproject gered/clj-browserchannel-immutant-adapter "0.0.3"
   :description  "Immutant async adapter for BrowserChannel"
   :url          "https://github.com/gered/clj-browserchannel/tree/master/clj-browserchannel-immutant-adapter"
 
