@@ -5,7 +5,8 @@
     goog.net.BrowserChannel
     goog.net.BrowserChannel.Handler
     [goog.events :as events]
-    [goog.debug.Logger.Level :as log-level]))
+    [goog.debug.Logger.Level :as log-level]
+    [net.thegeez.browserchannel.utils :refer [get-middleware-handler-map run-middleware]]))
 
 (def ^:private bch-state-enum-to-keyword
   {
@@ -176,8 +177,8 @@
     (.disconnect (get-channel))))
 
 (defn- connect-channel!
-  [{:keys [on-opening] :as events}
-   {:keys [base] :as options}
+  [events
+   {:keys [base middleware] :as options}
    {:keys [old-session-id last-array-id] :as connect-args}]
   (let [state (channel-state)]
     (when (or (= state :closed)
@@ -191,7 +192,7 @@
                 ; not really sure that passing in -1 is a good idea though
                 ; (that is, i don't think -1 ever gets passed in the AID param)
                 (if-not (= -1 last-array-id) last-array-id))
-      (if on-opening (on-opening)))))
+      (run-middleware (:on-opening middleware) (:on-opening events)))))
 
 (defn- reconnect!
   [events handler options connect-args]
@@ -209,13 +210,13 @@
       (if callback (callback)))))
 
 (defn- ->browserchannel-handler
-  [{:keys [on-open on-close on-receive on-sent on-error] :as events} options]
+  [events {:keys [middleware] :as options}]
   (let [handler (goog.net.BrowserChannel.Handler.)]
     (set! (.-channelOpened handler)
           (fn [_]
             (clear-last-error!)
             (reset-reconnect-attempts-counter!)
-            (if on-open (on-open))))
+            (run-middleware (:on-open middleware) (:on-open events))))
     (set! (.-channelClosed handler)
           (fn [_ pending undelivered]
             (let [last-error       (:last-error @state)
@@ -236,26 +237,27 @@
               (when due-to-error?
                 (raise-context-callbacks! pending :on-error)
                 (raise-context-callbacks! undelivered :on-error))
-              (if on-close
-                (on-close due-to-error?
-                          (decode-queued-map-array pending)
-                          (decode-queued-map-array undelivered)))
+              (run-middleware
+                (:on-close middleware)
+                (:on-close events)
+                due-to-error?
+                (decode-queued-map-array pending)
+                (decode-queued-map-array undelivered))
               (clear-last-error!))))
     (set! (.-channelHandleArray handler)
           (fn [_ m]
-            (if on-receive
-              (on-receive (decode-map m)))))
+            (run-middleware (:on-receive middleware) (:on-receive events) (decode-map m))))
     (set! (.-channelSuccess handler)
           (fn [_ delivered]
-            (if on-sent
-              (let [decoded (decode-queued-map-array delivered)]
-                (if (seq decoded) (on-sent decoded))))
-            (raise-context-callbacks! delivered :on-success)))
+            (raise-context-callbacks! delivered :on-success)
+            (let [decoded (decode-queued-map-array delivered)]
+              (if (seq decoded)
+                (run-middleware (:on-sent middleware) (:on-sent events) decoded)))))
     (set! (.-channelError handler)
           (fn [_ error-code]
             (let [error-code (get bch-error-enum-to-keyword error-code :unknown)]
               (set-last-error! error-code)
-              (if on-error (on-error error-code)))))
+              (run-middleware (:on-error middleware) (:on-error events) error-code))))
     handler))
 
 (def default-options
@@ -331,7 +333,12 @@
    for the supported options, see
    net.thegeez.browserchannel.client/default-options"
   [events & [options]]
-  (let [options (merge default-options options)]
+  (let [middleware (get-middleware-handler-map
+                     (:middleware options)
+                     [:on-opening :on-open :on-close :on-receive :on-sent :on-error])
+        options    (-> default-options
+                       (merge options)
+                       (assoc :middleware middleware))]
     (events/listen js/window "unload" disconnect!)
     (set-new-channel!)
     (.setHandler (get-channel) (->browserchannel-handler events options))
