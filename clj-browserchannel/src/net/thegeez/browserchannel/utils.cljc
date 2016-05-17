@@ -6,20 +6,13 @@
                   (if f
                     (recur (f handler) more)
                     handler))
-        handler (wrap final-handler middleware)]
+        handler (wrap (or final-handler (fn [& _])) middleware)]
     (apply handler args)))
-
-(defn get-handlers
-  [middleware k]
-  (->> middleware
-       (map k)
-       (remove nil?)
-       (doall)))
 
 (defn get-middleware-handler-map
   [middleware handler-ks]
   (reduce
     (fn [m k]
-      (assoc m k (get-handlers middleware k)))
+      (assoc m k (->> middleware (map k) (remove nil?))))
     {}
     handler-ks))
