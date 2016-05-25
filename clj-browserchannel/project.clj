@@ -1,4 +1,4 @@
-(defproject gered/clj-browserchannel "0.3.1"
+(defproject gered/clj-browserchannel "0.3.2"
   :description  "BrowserChannel server implementation in Clojure, with a ClojureScript wrapper for the BrowserChannel API included in Google Closure."
   :url          "https://github.com/gered/clj-browserchannel/tree/master/clj-browserchannel"
 

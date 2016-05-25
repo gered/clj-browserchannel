@@ -11,7 +11,7 @@
                   [compojure "1.4.0"]
                   [clj-pebble "0.2.0"]
                   [prismatic/dommy "1.1.0"]
-                  [gered/clj-browserchannel "0.3.1"]
+                  [gered/clj-browserchannel "0.3.2"]
                   [gered/clj-browserchannel-jetty-adapter "0.1.1"]
                   [gered/clj-browserchannel-immutant-adapter "0.0.3"]
                   [environ "1.0.3"]]
