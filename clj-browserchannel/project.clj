@@ -4,8 +4,7 @@
 
   :dependencies [[org.clojure/tools.logging "0.3.1"]
                  [ring/ring-core "1.4.0"]
-                 [cheshire "5.6.1"]
-                 [prismatic/dommy "1.1.0"]]
+                 [cheshire "5.6.1"]]
                  
   :profiles     {:provided
                  {:dependencies

@@ -1,7 +1,6 @@
 (ns net.thegeez.browserchannel.client
   (:require
     [cljs.reader :as reader]
-    [dommy.core :refer-macros [sel1]]
     goog.net.BrowserChannel
     goog.net.BrowserChannel.Handler
     [goog.events :as events]
