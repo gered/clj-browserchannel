@@ -141,10 +141,27 @@
         (.sendMap (get-channel) m context)
         (swap! state update-in [:queued-buffer] conj [m context])))))
 
+(defn- get-metatag-content [metatag-name]
+  (if-let [tag (aget (.querySelectorAll js/document (str "meta[name='" metatag-name "']")) 0)]
+    (.-content tag)))
+
+(defn- get-hidden-field-value [hidden-field-id]
+  (if-let [hidden-field (.getElementById js/document hidden-field-id)]
+    (.-value hidden-field)))
+
 (defn- get-anti-forgery-token
   []
-  (if-let [tag (sel1 "meta[name='anti-forgery-token']")]
-    (.-content tag)))
+  ; bunch of common names for this csrf token that i've seen used
+  ; ring's own anti-forgery middleware has a helper which outputs
+  ; an <input type="hidden"> with the id "__anti-forgery-token"
+  (->> [(get-metatag-content "anti-forgery-token")
+        (get-metatag-content "__anti-forgery-token")
+        (get-metatag-content "csrf-token")
+        (get-hidden-field-value "anti-forgery-token")
+        (get-hidden-field-value "__anti-forgery-token")
+        (get-hidden-field-value "csrf-token")]
+       (remove nil?)
+       (first)))
 
 (defn- apply-options!
   [options]
@@ -339,6 +356,11 @@
         options    (-> default-options
                        (merge options)
                        (assoc :middleware middleware))]
+    ; note that on Chrome this will almost certainly not have time to send
+    ; a disconnect to the server resulting in a lot of Chrome user sessions
+    ; that will have to time out naturally to get removed on the server.
+    ; on other browsers (e.g. Firefox), this onunload event works perfectly
+    ; most of the time.
     (events/listen js/window "unload" disconnect!)
     (set-new-channel!)
     (.setHandler (get-channel) (->browserchannel-handler events options))
