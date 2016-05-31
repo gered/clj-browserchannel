@@ -5,6 +5,8 @@
   :dependencies [[org.clojure/tools.logging "0.3.1"]
                  [ring/ring-core "1.4.0"]
                  [cheshire "5.6.1"]]
+
+  :plugins      [[lein-cljsbuild "1.1.3"]]
                  
   :profiles     {:provided
                  {:dependencies
@@ -15,4 +17,8 @@
                  {:dependencies [[pjstadig/humane-test-output "0.8.0"]
                                  [ring/ring-mock "0.3.0"]]
                   :injections   [(require 'pjstadig.humane-test-output)
-                                 (pjstadig.humane-test-output/activate!)]}})
+                                 (pjstadig.humane-test-output/activate!)]}}
+
+  :cljsbuild    {:builds
+                 {:main
+                  {:source-paths ["src"]}}})
